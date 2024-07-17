@@ -14,6 +14,7 @@ export function GET({url}){
 
 function exchangeCodeForAccessToken(code) {
 
+    console.log("inside exchangeCodeForAccessToken");
     const params = {
         "client_id": CLIENT_CODE,
         "client_secret": CLIENT_SECRET,
@@ -21,7 +22,7 @@ function exchangeCodeForAccessToken(code) {
     }
 
     if (DEBUG === "true") {
-        console.table(params)
+        console.log(params)
     }
 
     fetch("https://github.com/login/oauth/access_token" + new URLSearchParams(params), {
@@ -34,6 +35,7 @@ function exchangeCodeForAccessToken(code) {
 }
 
 async function addNewUser({res}) {
+    console.log("inside addNewUser " + res);
     const err = supabase.from("users").upsert({
         token_content: res.json()
     }).select()
