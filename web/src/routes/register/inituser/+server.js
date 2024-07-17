@@ -4,8 +4,9 @@ import {supabase} from "$lib/supabaseClient.js";
 /** @type {import('./$types').RequestHandler} */
 export function GET({url}){
     console.log("In get handler")
+    console.table(url)
     const userCode = url.searchParams.get('code')
-    console.log(userCode)
+    console.log("Usercode : " + userCode)
     exchangeCodeForAccessToken(userCode)
 
     supabase.from("test").upsert({
