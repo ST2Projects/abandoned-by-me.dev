@@ -25,7 +25,11 @@ function exchangeCodeForAccessToken(code) {
         console.log(params)
     }
 
-    fetch("https://github.com/login/oauth/access_token" + new URLSearchParams(params), {
+    const requestURL = "https://github.com/login/oauth/access_token" + new URLSearchParams(params)
+
+    console.log(requestURL)
+
+    fetch(requestURL, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
     }).then(async res => {
