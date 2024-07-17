@@ -9,10 +9,6 @@ export function GET({url}){
     console.log("Usercode : " + userCode)
     exchangeCodeForAccessToken(userCode)
 
-    supabase.from("test").upsert({
-        content: "hello " + new Date()
-    })
-
     return new Response(String("OK"))
 }
 
@@ -31,14 +27,14 @@ function exchangeCodeForAccessToken(code) {
     fetch("https://github.com/login/oauth/access_token" + new URLSearchParams(params), {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-    }).then(res => {
+    }).then(async res => {
         console.log("Inside response handler")
-        addNewUser(res)
+        await addNewUser(res)
     }).catch(e => console.error(e))
 }
 
-function addNewUser({res}) {
+async function addNewUser({res}) {
     const err = supabase.from("users").upsert({
         token_content: res.json()
-    })
+    }).select()
 }
