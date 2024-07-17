@@ -25,7 +25,7 @@ function exchangeCodeForAccessToken(code) {
         console.log(params)
     }
 
-    const requestURL = "https://github.com/login/oauth/access_token" + new URLSearchParams(params)
+    const requestURL = "https://github.com/login/oauth/access_token?" + new URLSearchParams(params)
 
     console.log(requestURL)
 
