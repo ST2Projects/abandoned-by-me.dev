@@ -2,17 +2,17 @@ import {CLIENT_CODE, CLIENT_SECRET, DEBUG} from "$env/static/private";
 import {supabase} from "$lib/supabaseClient.js";
 
 /** @type {import('./$types').RequestHandler} */
-export function GET({url}){
+export async function GET({url}){
     console.log("In get handler")
     console.table(url)
     const userCode = url.searchParams.get('code')
     console.log("Usercode : " + userCode)
-    exchangeCodeForAccessToken(userCode)
+    await exchangeCodeForAccessToken(userCode)
 
     return new Response(String("OK"))
 }
 
-function exchangeCodeForAccessToken(code) {
+async function exchangeCodeForAccessToken(code) {
 
     console.log("inside exchangeCodeForAccessToken");
     const params = {
@@ -29,7 +29,7 @@ function exchangeCodeForAccessToken(code) {
 
     console.log(requestURL)
 
-    fetch(requestURL, {
+    await fetch(requestURL, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
     }).then(async res => {
@@ -40,7 +40,7 @@ function exchangeCodeForAccessToken(code) {
 
 async function addNewUser({res}) {
     console.log("inside addNewUser " + res);
-    const err = supabase.from("users").upsert({
+    const err = await supabase.from("users").upsert({
         token_content: res.json()
     }).select()
 }
