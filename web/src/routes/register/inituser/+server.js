@@ -32,15 +32,16 @@ async function exchangeCodeForAccessToken(code) {
     await fetch(requestURL, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-    }).then(async res => {
+    }).then(res => res.json())
+        .then(async json => {
         console.log("Inside response handler")
-        await addNewUser(res)
+        await addNewUser(json)
     }).catch(e => console.error(e))
 }
 
 async function addNewUser(res) {
-    console.log("inside addNewUser " + res.json());
+    console.log("inside addNewUser " + res);
     const err = await supabase.from("users").upsert({
-        token_content: res.json()
+        token_content: res
     }).select()
 }
