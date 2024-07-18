@@ -32,7 +32,7 @@ async function exchangeCodeForAccessToken(code) {
     await fetch(requestURL, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-    }).then(res => res.json())
+    }).then(res => res.text())
         .then(async json => {
         console.log("Inside response handler")
         await addNewUser(json)
