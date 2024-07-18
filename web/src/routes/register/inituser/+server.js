@@ -38,7 +38,7 @@ async function exchangeCodeForAccessToken(code) {
     }).catch(e => console.error(e))
 }
 
-async function addNewUser({res}) {
+async function addNewUser(res) {
     console.log("inside addNewUser " + res);
     const err = await supabase.from("users").upsert({
         token_content: res.json()
