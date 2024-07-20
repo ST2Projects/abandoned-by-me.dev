@@ -46,7 +46,13 @@ async function exchangeCodeForAccessToken(code) {
                 "token_type": responseParams.get("token_type"),
             }
 
-            const modifiedRows = await supabase.from("users").upsert(responseJson).select()
+            const userString = JSON.stringify(responseJson)
+
+            console.log(`Response json ${userString}`)
+
+            const modifiedRows = await supabase.from("users").upsert({
+                "token_content": userString
+            }).select()
             console.log(`Modified rows: ${modifiedRows}`)
     }).catch(e => console.error(e))
 }
