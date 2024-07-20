@@ -1,6 +1,7 @@
 import {CLIENT_CODE, CLIENT_SECRET, DEBUG} from "$env/static/private";
 import {Octokit} from "octokit";
 import {supabase} from "$lib/supabaseClient.js";
+import {userSessionStore} from "$lib/stores.js";
 
 /** @type {import('./$types').RequestHandler} */
 export async function GET({url}){
@@ -8,12 +9,13 @@ export async function GET({url}){
     console.table(url)
     const userCode = url.searchParams.get('code')
     console.log("Usercode : " + userCode)
-    await exchangeCodeForAccessToken(userCode)
+    await buildUserObjectFromCallbackCode(userCode)
+    await getUserRepoInfo()
 
     return new Response(String("OK"))
 }
 
-async function exchangeCodeForAccessToken(code) {
+async function buildUserObjectFromCallbackCode(code) {
 
     console.log("inside exchangeCodeForAccessToken");
     const params = {
@@ -64,7 +66,20 @@ async function exchangeCodeForAccessToken(code) {
     console.log(`User State: ${JSON.stringify(userAuthResponse)}`)
 
     await supabase.from("users").upsert(userAuthResponse)
-        .select()
+
+    storeUserSessionInfo(octokit, userAuthResponse.username, userAuthResponse.access_token)
+}
+
+function storeUserSessionInfo(octokit, username, access_token) {
+    userSessionStore.set({
+        "client": octokit,
+        "username": username,
+        "access_token": access_token
+    })
+}
+
+async function getUserRepoInfo() {
+    console.log($userSessionStore.username)
 }
 
 
