@@ -44,7 +44,6 @@ async function exchangeCodeForAccessToken(code) {
                 "expires_in": responseParams.get("expires_in"),
                 "refresh_token": responseParams.get("refresh_token"),
                 "refresh_token_expires_in": responseParams.get("refresh_token_expires_in"),
-                "token_type": responseParams.get("token_type"),
             }
     }).catch(e => console.error(e))
 
