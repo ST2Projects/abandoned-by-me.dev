@@ -32,16 +32,20 @@ async function exchangeCodeForAccessToken(code) {
     await fetch(requestURL, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-    }).then(res => res.text())
-        .then(async json => {
-        console.log("Inside response handler")
-        await addNewUser(json)
-    }).catch(e => console.error(e))
-}
+    })
+        .then(res => res.text())
+        .then(responseText => {
+            console.log(`Inside response handler with resp ${responseText}`)
+            const responseParams = new URLSearchParams(responseText)
 
-async function addNewUser(res) {
-    console.log("inside addNewUser " + res);
-    const err = await supabase.from("users").upsert({
-        token_content: res
-    }).select()
+            const responseJson = {
+                "access_token": responseParams.get("access_token"),
+                "expires_in": responseParams.get("expires_in"),
+                "refresh_token": responseParams.get("refresh_token"),
+                "refresh_token_expires_in": responseParams.get("refresh_token_expires_in"),
+                "token_type": responseParams.get("token_type"),
+            }
+
+            supabase.from("users").upsert(responseJson).select()
+    }).catch(e => console.error(e))
 }
