@@ -34,7 +34,7 @@ async function exchangeCodeForAccessToken(code) {
         headers: {'Content-Type': 'application/json'},
     })
         .then(res => res.text())
-        .then(responseText => {
+        .then( async responseText => {
             console.log(`Inside response handler with resp ${responseText}`)
             const responseParams = new URLSearchParams(responseText)
 
@@ -46,6 +46,7 @@ async function exchangeCodeForAccessToken(code) {
                 "token_type": responseParams.get("token_type"),
             }
 
-            supabase.from("users").upsert(responseJson).select()
+            const modifiedRows = await supabase.from("users").upsert(responseJson).select()
+            console.log(`Modified rows: ${modifiedRows}`)
     }).catch(e => console.error(e))
 }
