@@ -1,9 +1,5 @@
 import { db, users } from './drizzle.js';
 import { eq, sql } from 'drizzle-orm';
-import { validateEnvironment } from '../utils/env.js';
-
-// Validate required environment variables
-validateEnvironment(['DATABASE_URL']);
 
 /**
  * Saves or updates user authentication data
