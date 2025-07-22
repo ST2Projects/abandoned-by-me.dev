@@ -37,10 +37,7 @@ services:
       # Database connection
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-abandoned_by_me}
       
-      # GitHub OAuth
-      CLIENT_CODE: ${CLIENT_CODE}
-      CLIENT_SECRET: ${CLIENT_SECRET}
-      PUBLIC_CLIENT_CODE: ${CLIENT_CODE}
+      # No GitHub OAuth configuration needed - users provide their own tokens
       
       # Application settings
       DEBUG: ${DEBUG:-false}

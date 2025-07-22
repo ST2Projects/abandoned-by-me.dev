@@ -135,10 +135,7 @@ POSTGRES_USER=postgres
 POSTGRES_PASSWORD=password
 POSTGRES_PORT=5432
 
-# GitHub OAuth App
-CLIENT_CODE=your_github_oauth_client_id
-CLIENT_SECRET=your_github_oauth_client_secret
-PUBLIC_CLIENT_CODE=your_github_oauth_client_id
+# No GitHub OAuth configuration needed - users provide their own tokens
 
 # Security
 JWT_SECRET=your-jwt-secret-key-here
@@ -218,12 +215,16 @@ This project has been migrated to use:
 - **Dokploy deployment** instead of Cloudflare Pages
 - **Node.js adapter** instead of Cloudflare adapter
 
-## GitHub OAuth Setup
+## Authentication
 
-1. Create a new GitHub OAuth App in your GitHub settings
-2. Set authorization callback URL to: `https://yourdomain.com/register/inituser`
-3. Request scopes: `user` and `repo` (for private repo access)
-4. Configure CLIENT_CODE and CLIENT_SECRET environment variables
+The application uses GitHub Personal Access Tokens for authentication instead of OAuth:
+
+1. **No OAuth app setup required** - users provide their own tokens
+2. **Better security** - no client secrets to manage
+3. **Simpler deployment** - no environment variables needed for auth
+4. **User control** - users can revoke access anytime via GitHub settings
+
+Users will be guided to create tokens with the required scopes (`repo` and `user`) during login.
 
 ## Testing Strategy
 

@@ -1,19 +1,63 @@
 <script>
 	import { page } from '$app/stores';
-	// Use CLIENT_CODE directly since it needs to be public
-	const CLIENT_CODE = 'your_github_client_id'; // This should be set via environment variables
+	import { goto } from '$app/navigation';
 	
 	$: returnUrl = $page.url.searchParams.get('return') || '/dashboard';
 	
-	function getGitHubAuthUrl() {
-		const params = new URLSearchParams({
-			client_id: CLIENT_CODE,
-			redirect_uri: `${window.location.origin}/register/inituser`,
-			scope: 'user repo',
-			state: returnUrl
-		});
+	let token = '';
+	let isLoading = false;
+	let error = '';
+	let showInstructions = false;
+	
+	const tokenInstructions = {
+		steps: [
+			'Go to GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)',
+			'Click "Generate new token (classic)"',
+			'Give your token a descriptive name like "Abandoned by Me Dashboard"',
+			'Select the following scopes:',
+			'• repo (Full control of private repositories)',
+			'• user (Read user profile data)',
+			'Click "Generate token"',
+			'Copy the token immediately (you won\'t be able to see it again)'
+		],
+		url: 'https://github.com/settings/tokens'
+	};
+	
+	async function handleTokenSubmit() {
+		if (!token.trim()) {
+			error = 'Please enter your GitHub token';
+			return;
+		}
 		
-		return `https://github.com/login/oauth/authorize?${params}`;
+		isLoading = true;
+		error = '';
+		
+		try {
+			const response = await fetch('/api/auth/validate-token', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({ token: token.trim() }),
+			});
+			
+			const result = await response.json();
+			
+			if (!response.ok) {
+				throw new Error(result.error || 'Token validation failed');
+			}
+			
+			// Redirect to dashboard or return URL
+			goto(returnUrl);
+		} catch (err) {
+			error = err.message;
+		} finally {
+			isLoading = false;
+		}
+	}
+	
+	function toggleInstructions() {
+		showInstructions = !showInstructions;
 	}
 </script>
 
@@ -33,8 +77,63 @@
 
 		<div class="login-card">
 			<div class="login-content">
-				<h2>Get Started</h2>
-				<p>Connect your GitHub account to analyze your repositories and create a shareable dashboard.</p>
+				<h2>Connect Your GitHub Account</h2>
+				<p>Enter your GitHub personal access token to analyze your repositories and create a shareable dashboard.</p>
+				
+				<div class="token-form">
+					<div class="form-group">
+						<label for="token">GitHub Personal Access Token</label>
+						<input
+							type="password"
+							id="token"
+							bind:value={token}
+							placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+							class="token-input"
+							disabled={isLoading}
+						/>
+						{#if error}
+							<div class="error-message">{error}</div>
+						{/if}
+					</div>
+					
+					<button
+						on:click={handleTokenSubmit}
+						disabled={isLoading || !token.trim()}
+						class="submit-btn"
+					>
+						{#if isLoading}
+							<div class="loading-spinner"></div>
+							Validating...
+						{:else}
+							<svg class="github-icon" viewBox="0 0 24 24" fill="currentColor">
+								<path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+							</svg>
+							Connect to GitHub
+						{/if}
+					</button>
+					
+					<button
+						on:click={toggleInstructions}
+						class="instructions-btn"
+						type="button"
+					>
+						{showInstructions ? 'Hide' : 'Show'} instructions
+					</button>
+				</div>
+				
+				{#if showInstructions}
+					<div class="instructions">
+						<h3>How to create a GitHub Personal Access Token:</h3>
+						<ol>
+							{#each tokenInstructions.steps as step}
+								<li>{step}</li>
+							{/each}
+						</ol>
+						<a href={tokenInstructions.url} target="_blank" rel="noopener noreferrer" class="github-link">
+							Open GitHub Token Settings →
+						</a>
+					</div>
+				{/if}
 				
 				<div class="features">
 					<div class="feature">
@@ -61,13 +160,6 @@
 						</div>
 					</div>
 				</div>
-				
-				<a href={getGitHubAuthUrl()} class="github-login-btn">
-					<svg class="github-icon" viewBox="0 0 24 24" fill="currentColor">
-						<path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-					</svg>
-					Continue with GitHub
-				</a>
 			</div>
 		</div>
 
@@ -171,14 +263,59 @@
 		line-height: 1.4;
 	}
 
-	.github-login-btn {
+	.token-form {
+		margin-bottom: 2rem;
+	}
+
+	.form-group {
+		margin-bottom: 1.5rem;
+	}
+
+	.form-group label {
+		display: block;
+		color: #1a1a1a;
+		font-weight: 600;
+		margin-bottom: 0.5rem;
+	}
+
+	.token-input {
+		width: 100%;
+		padding: 1rem;
+		border: 2px solid #e1e5e9;
+		border-radius: 0.5rem;
+		font-size: 1rem;
+		font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+		background: #f8f9fa;
+		transition: all 0.2s;
+		box-sizing: border-box;
+	}
+
+	.token-input:focus {
+		outline: none;
+		border-color: #0366d6;
+		background: white;
+		box-shadow: 0 0 0 3px rgba(3, 102, 214, 0.1);
+	}
+
+	.token-input:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+
+	.error-message {
+		color: #d73a49;
+		font-size: 0.9rem;
+		margin-top: 0.5rem;
+	}
+
+	.submit-btn {
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		gap: 0.75rem;
 		background: #24292e;
 		color: white;
-		text-decoration: none;
+		border: none;
 		padding: 1rem 2rem;
 		border-radius: 0.5rem;
 		font-weight: 600;
@@ -186,17 +323,90 @@
 		transition: all 0.2s;
 		width: 100%;
 		box-sizing: border-box;
+		cursor: pointer;
+		margin-bottom: 1rem;
 	}
 
-	.github-login-btn:hover {
+	.submit-btn:hover:not(:disabled) {
 		background: #1a1e22;
 		transform: translateY(-1px);
 		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 	}
 
+	.submit-btn:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+		transform: none;
+		box-shadow: none;
+	}
+
+	.instructions-btn {
+		background: transparent;
+		color: #0366d6;
+		border: none;
+		font-size: 0.9rem;
+		cursor: pointer;
+		text-decoration: underline;
+		padding: 0.5rem 0;
+		width: 100%;
+	}
+
+	.instructions-btn:hover {
+		color: #0256cc;
+	}
+
+	.instructions {
+		background: #f6f8fa;
+		border: 1px solid #e1e5e9;
+		border-radius: 0.5rem;
+		padding: 1.5rem;
+		margin-bottom: 2rem;
+	}
+
+	.instructions h3 {
+		margin: 0 0 1rem 0;
+		color: #1a1a1a;
+		font-size: 1.1rem;
+	}
+
+	.instructions ol {
+		margin: 0 0 1rem 0;
+		padding-left: 1.5rem;
+	}
+
+	.instructions li {
+		margin-bottom: 0.5rem;
+		color: #666;
+		line-height: 1.5;
+	}
+
+	.github-link {
+		color: #0366d6;
+		text-decoration: none;
+		font-weight: 600;
+	}
+
+	.github-link:hover {
+		text-decoration: underline;
+	}
+
 	.github-icon {
 		width: 20px;
 		height: 20px;
+	}
+
+	.loading-spinner {
+		width: 20px;
+		height: 20px;
+		border: 2px solid transparent;
+		border-top: 2px solid currentColor;
+		border-radius: 50%;
+		animation: spin 1s linear infinite;
+	}
+
+	@keyframes spin {
+		0% { transform: rotate(0deg); }
+		100% { transform: rotate(360deg); }
 	}
 
 	.footer-info {

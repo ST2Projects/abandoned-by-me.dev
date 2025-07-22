@@ -31,9 +31,7 @@ nano .env
 # Database (for external PostgreSQL, otherwise docker-compose handles it)
 DATABASE_URL=postgresql://postgres:yourpassword@postgres:5432/abandoned_by_me
 
-# GitHub OAuth
-CLIENT_CODE=your_github_client_id
-CLIENT_SECRET=your_github_client_secret
+# No GitHub OAuth configuration needed - users provide their own personal access tokens
 
 # Security (generate secure random strings)
 JWT_SECRET=$(openssl rand -hex 32)
@@ -102,8 +100,6 @@ docker run -d \
   --name abandoned-by-me-app \
   -p 3000:3000 \
   -e DATABASE_URL="postgresql://..." \
-  -e CLIENT_CODE="..." \
-  -e CLIENT_SECRET="..." \
   abandoned-by-me:latest
 ```
 
@@ -182,10 +178,10 @@ docker-compose exec postgres psql -U postgres -d abandoned_by_me -c "\dt"
 docker-compose exec postgres psql -U postgres -d abandoned_by_me -f /docker-entrypoint-initdb.d/init.sql
 ```
 
-### OAuth not working
-- Verify callback URL matches: `https://yourdomain.com/register/inituser`
-- Check CLIENT_CODE and CLIENT_SECRET are correct
-- Ensure domain is properly configured
+### Authentication not working
+- Ensure users are creating GitHub Personal Access Tokens with the correct scopes
+- Check that tokens have both `repo` and `user` permissions
+- Verify the GitHub API is accessible from your server
 
 ## Updates
 

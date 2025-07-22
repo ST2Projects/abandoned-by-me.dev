@@ -1,4 +1,3 @@
-import { CLIENT_CODE, CLIENT_SECRET } from '$env/static/private';
 import { createGitHubClient, getUserInfo } from '../github/client.js';
 
 /**
@@ -6,74 +5,65 @@ import { createGitHubClient, getUserInfo } from '../github/client.js';
  */
 
 /**
- * Exchanges authorization code for access token
- * @param {string} code - Authorization code from GitHub OAuth callback
- * @returns {Promise<GitHubAuthResponse>} Auth response with tokens and user info
- * @throws {Error} If the token exchange fails
+ * Validates a GitHub personal access token and returns user info
+ * @param {string} token - GitHub personal access token
+ * @returns {Promise<GitHubAuthResponse>} Auth response with token and user info
+ * @throws {Error} If the token validation fails
  */
-export async function exchangeCodeForTokens(code) {
-	const params = {
-		client_id: CLIENT_CODE,
-		client_secret: CLIENT_SECRET,
-		code: code
-	};
-
-	const requestURL = 'https://github.com/login/oauth/access_token?' + new URLSearchParams(params);
-
+export async function validateGitHubToken(token) {
 	try {
-		const response = await fetch(requestURL, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				'Accept': 'application/json'
-			}
-		});
-
-		if (!response.ok) {
-			throw new Error(`GitHub OAuth request failed: ${response.status} ${response.statusText}`);
-		}
-
-		const data = await response.json();
-
-		if (data.error) {
-			throw new Error(`GitHub OAuth error: ${data.error_description || data.error}`);
-		}
-
-		// Get user info
-		const client = createGitHubClient(data.access_token);
+		// Create GitHub client with the token
+		const client = createGitHubClient(token);
+		
+		// Get user info to validate the token
 		const userInfo = await getUserInfo(client);
+		
+		// Check if token has required scopes by testing repository access
+		try {
+			await client.request('GET /user/repos', {
+				per_page: 1,
+				headers: {
+					'X-GitHub-Api-Version': '2022-11-28'
+				}
+			});
+		} catch (error) {
+			if (error.status === 403) {
+				throw new Error('Token does not have required repository access. Please ensure your token has "repo" scope.');
+			}
+			throw error;
+		}
 
 		return {
-			access_token: data.access_token,
-			access_token_expires_in: data.expires_in,
-			refresh_token: data.refresh_token,
-			refresh_token_expires_in: data.refresh_token_expires_in,
-			username: userInfo.login
+			access_token: token,
+			access_token_expires_in: null, // Personal tokens don't expire unless revoked
+			refresh_token: null,
+			refresh_token_expires_in: null,
+			username: userInfo.login,
+			user_info: userInfo
 		};
 	} catch (error) {
-		console.error('OAuth token exchange failed:', error);
+		console.error('GitHub token validation failed:', error);
 		throw error;
 	}
 }
 
 /**
- * Generates GitHub OAuth authorization URL
- * @param {string} clientId - GitHub OAuth client ID
- * @param {string} redirectUri - OAuth redirect URI
- * @param {string[]} [scopes=['user', 'repo']] - OAuth scopes
- * @param {string} [state] - State parameter for security
- * @returns {string} Authorization URL
+ * Generates instructions for creating a GitHub personal access token
+ * @returns {Object} Instructions and required scopes
  */
-export function getAuthorizationUrl(clientId, redirectUri, scopes = ['user', 'repo'], state) {
-	const params = new URLSearchParams({
-		client_id: clientId,
-		redirect_uri: redirectUri,
-		scope: scopes.join(' ')
-	});
-
-	if (state) {
-		params.append('state', state);
-	}
-
-	return `https://github.com/login/oauth/authorize?${params}`;
+export function getTokenInstructions() {
+	return {
+		steps: [
+			'Go to GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)',
+			'Click "Generate new token (classic)"',
+			'Give your token a descriptive name like "Abandoned by Me Dashboard"',
+			'Select the following scopes:',
+			'• repo (Full control of private repositories)',
+			'• user (Read user profile data)',
+			'Click "Generate token"',
+			'Copy the token immediately (you won\'t be able to see it again)'
+		],
+		scopes: ['repo', 'user'],
+		url: 'https://github.com/settings/tokens'
+	};
 }
