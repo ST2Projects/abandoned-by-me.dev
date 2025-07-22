@@ -33,6 +33,7 @@ RUN adduser --system --uid 1001 sveltekit
 
 # Copy built application
 COPY --from=builder --chown=sveltekit:nodejs /app/build ./build
+COPY --from=builder --chown=sveltekit:nodejs /app/start.js ./start.js
 COPY --from=builder --chown=sveltekit:nodejs /app/package*.json ./
 COPY --from=deps --chown=sveltekit:nodejs /app/node_modules ./node_modules
 
@@ -44,4 +45,4 @@ ENV HOST=0.0.0.0
 ENV PORT=3456
 
 # Start the application
-CMD ["node", "build"]
+CMD ["node", "start.js"]
