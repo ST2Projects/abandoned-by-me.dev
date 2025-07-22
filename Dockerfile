@@ -41,7 +41,7 @@ USER sveltekit
 EXPOSE 3000
 
 ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
+ENV HOST=0.0.0.0
 
 # Start the application
 CMD ["node", "build"]
