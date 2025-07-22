@@ -38,7 +38,7 @@ COPY --from=deps --chown=sveltekit:nodejs /app/node_modules ./node_modules
 
 USER sveltekit
 
-EXPOSE 3000
+EXPOSE 3456
 
 ENV HOST=0.0.0.0
 
