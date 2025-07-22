@@ -1,0 +1,44 @@
+{
+	"name": "abandoned-by-me-dev",
+	"version": "0.0.1",
+	"scripts": {
+		"dev": "vite dev",
+		"build": "vite build",
+		"preview": "vite preview",
+		"test": "npm run test:integration && npm run test:unit",
+		"test:integration": "playwright test",
+		"test:unit": "vitest",
+		"test:unit:watch": "vitest --watch",
+		"format": "prettier --write .",
+		"format:check": "prettier --check .",
+		"lint": "eslint .",
+		"lint:fix": "eslint . --fix",
+		"type-check": "svelte-check --tsconfig ./tsconfig.json",
+		"db:generate": "drizzle-kit generate:pg",
+		"db:push": "drizzle-kit push:pg",
+		"db:migrate": "node src/lib/database/migrate.js",
+		"db:studio": "drizzle-kit studio"
+	},
+	"type": "module",
+	"dependencies": {
+		"drizzle-orm": "^0.29.3",
+		"octokit": "^4.0.2",
+		"pg": "^8.11.3"
+	},
+	"devDependencies": {
+		"@fontsource/fira-mono": "^4.5.10",
+		"@neoconfetti/svelte": "^1.0.0",
+		"@playwright/test": "^1.28.1",
+		"@sveltejs/adapter-node": "^2.0.0",
+		"@sveltejs/kit": "^2.0.0",
+		"@sveltejs/vite-plugin-svelte": "^3.0.0",
+		"@types/pg": "^8.10.9",
+		"drizzle-kit": "^0.20.13",
+		"globals": "^15.0.0",
+		"prettier": "^3.1.1",
+		"prettier-plugin-svelte": "^3.1.2",
+		"svelte": "^4.2.7",
+		"vite": "^5.0.3",
+		"vitest": "^1.2.0"
+	}
+}

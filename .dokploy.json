@@ -1,0 +1,28 @@
+{
+  "name": "abandoned-by-me",
+  "type": "docker-compose",
+  "compose": {
+    "file": "docker-compose.yml"
+  },
+  "env": {
+    "production": {
+      "NODE_ENV": "production",
+      "DEBUG": "false"
+    }
+  },
+  "domains": [
+    {
+      "service": "app",
+      "domain": "abandoned-by-me.dev",
+      "port": 3000
+    }
+  ],
+  "healthChecks": {
+    "app": {
+      "path": "/",
+      "interval": 30,
+      "timeout": 10,
+      "retries": 3
+    }
+  }
+}

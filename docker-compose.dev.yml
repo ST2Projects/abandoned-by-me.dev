@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database for development
+  postgres:
+    image: postgres:15-alpine
+    container_name: abandoned-by-me-db-dev
+    environment:
+      POSTGRES_DB: abandoned_by_me
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: localdev
+    volumes:
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Redis for session storage (optional for development)
+  redis:
+    image: redis:7-alpine
+    container_name: abandoned-by-me-redis-dev
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  postgres_data_dev:
+    driver: local
+  redis_data_dev:
+    driver: local
