@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 // Custom startup script with better port handling and logging
-const { spawn } = require('child_process');
+import { spawn } from 'child_process';
 
 // Determine the port from various possible environment variables
 const port = process.env.PORT || process.env.APP_PORT || '3456';
