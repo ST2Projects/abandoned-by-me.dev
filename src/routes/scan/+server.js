@@ -1,47 +1,64 @@
 import { error, json } from '@sveltejs/kit';
-import { getCurrentSession } from '$lib/auth/session.js';
-import { getUserByUsername } from '$lib/database/users.js';
+import { eq, and } from 'drizzle-orm';
+import { auth } from '$lib/auth/auth.js';
+import { db, scanHistory } from '$lib/database/drizzle.js';
 import { getUserConfig } from '$lib/database/userConfig.js';
 import { upsertRepositories, cleanupRemovedRepositories } from '$lib/database/repositories.js';
 import { startScan, completeScan, failScan, getRunningScan } from '$lib/database/scanHistory.js';
 import { performRepositoryScan } from '$lib/github/analyzer.js';
+import { getGitHubToken } from '$lib/database/accounts.js';
 import { errorLog, debugLog } from '$lib/utils/env.js';
+import { scanLimiter, getClientKey } from '$lib/utils/rateLimit.js';
 
 /**
  * Initiates a repository scan for the authenticated user
  */
-export async function POST({ request }) {
+export async function POST(event) {
 	try {
-		// Check authentication
-		const session = await getCurrentSession();
-		if (!session || !session.username) {
+		const { request } = event;
+		const session = await auth.api.getSession({ headers: request.headers });
+		if (!session?.user) {
 			throw error(401, 'Authentication required');
 		}
 
-		// Get user from database
-		const user = await getUserByUsername(session.username);
-		if (!user) {
-			throw error(404, 'User not found');
+		// Rate limit scan requests per user
+		const rateCheck = scanLimiter.check(session.user.id);
+		if (!rateCheck.allowed) {
+			return json(
+				{ error: 'Too many scan requests. Please try again later.' },
+				{ status: 429, headers: { 'Retry-After': String(rateCheck.retryAfter) } }
+			);
 		}
 
+		const userId = session.user.id;
+		const username = session.user.name || session.user.email;
+
 		// Check if there's already a running scan
-		const runningScan = await getRunningScan(user.id);
+		const runningScan = await getRunningScan(userId);
 		if (runningScan) {
-			return json({ 
+			return json({
 				error: 'Scan already in progress',
-				scanId: runningScan.id 
+				scanId: runningScan.id
 			}, { status: 409 });
 		}
 
 		// Get user configuration
-		const config = await getUserConfig(user.id);
+		const config = await getUserConfig(userId);
 
-		// Start scan record
-		const scan = await startScan(user.id);
-		debugLog(`Started repository scan for user ${user.username}`);
+		// Get the GitHub access token from the account linked via better-auth
+		// Validate token BEFORE creating a scan record to avoid orphaned "running" records
+		const accessToken = getGitHubToken(userId);
+
+		if (!accessToken) {
+			throw error(400, 'GitHub account not linked. Please sign in with GitHub again.');
+		}
+
+		// Start scan record (only after token is confirmed valid)
+		const scan = await startScan(userId);
+		debugLog(`Started repository scan for user ${username}`);
 
 		// Perform the scan asynchronously (don't await)
-		performScanAsync(scan.id, user, config, session.access_token);
+		performScanAsync(scan.id, userId, username, config, accessToken);
 
 		return json({
 			success: true,
@@ -50,43 +67,37 @@ export async function POST({ request }) {
 		});
 
 	} catch (err) {
+		if (err.status) throw err;
 		errorLog('Error starting repository scan', err);
-		throw error(500, err.message || 'Failed to start repository scan');
+		throw error(500, 'Failed to start repository scan');
 	}
 }
 
 /**
  * Gets the status of a repository scan
  */
-export async function GET({ url }) {
+export async function GET({ url, request }) {
 	try {
 		const scanId = url.searchParams.get('scanId');
 		if (!scanId) {
 			throw error(400, 'Scan ID required');
 		}
 
-		// Check authentication
-		const session = await getCurrentSession();
-		if (!session || !session.username) {
+		const session = await auth.api.getSession({ headers: request.headers });
+		if (!session?.user) {
 			throw error(401, 'Authentication required');
 		}
 
-		// Get user from database
-		const user = await getUserByUsername(session.username);
-		if (!user) {
-			throw error(404, 'User not found');
-		}
+		const userId = session.user.id;
 
 		// Get scan status
-		const { db, scanHistory } = await import('$lib/database/drizzle.js');
-		const { eq, and } = await import('drizzle-orm');
 		const result = await db
 			.select()
 			.from(scanHistory)
 			.where(
 				and(
 					eq(scanHistory.id, scanId),
-					eq(scanHistory.userId, user.id)
+					eq(scanHistory.userId, userId)
 				)
 			)
 			.limit(1);
@@ -98,23 +109,24 @@ export async function GET({ url }) {
 		return json(result[0]);
 
 	} catch (err) {
+		if (err.status) throw err;
 		errorLog('Error getting scan status', err);
-		throw error(500, err.message || 'Failed to get scan status');
+		throw error(500, 'Failed to get scan status');
 	}
 }
 
 /**
  * Performs the repository scan asynchronously
  */
-async function performScanAsync(scanId, user, config, accessToken) {
+async function performScanAsync(scanId, userId, username, config, accessToken) {
 	try {
-		debugLog(`Performing async scan ${scanId} for user ${user.username}`);
+		debugLog(`Performing async scan ${scanId} for user ${username}`);
 
 		// Perform the GitHub repository scan
 		const repositories = await performRepositoryScan(
 			accessToken,
-			user.username,
-			config.scan_private_repos
+			username,
+			config.scanPrivateRepos
 		);
 
 		if (repositories.length === 0) {
@@ -130,16 +142,16 @@ async function performScanAsync(scanId, user, config, accessToken) {
 		const currentGithubIds = repositories.map(repo => repo.github_id);
 
 		// Upsert repositories to database
-		const upsertedRepos = await upsertRepositories(user.id, repositories);
+		const upsertedRepos = await upsertRepositories(userId, repositories);
 
 		// Clean up repositories that no longer exist on GitHub
-		const deletedCount = await cleanupRemovedRepositories(user.id, currentGithubIds);
+		const deletedCount = await cleanupRemovedRepositories(userId, currentGithubIds);
 
 		// Complete the scan
 		await completeScan(scanId, {
 			reposScanned: repositories.length,
 			reposAdded: upsertedRepos.length,
-			reposUpdated: upsertedRepos.length, // This would need more logic to differentiate
+			reposUpdated: upsertedRepos.length,
 		});
 
 		debugLog(`Completed scan ${scanId}`, {
@@ -148,8 +160,8 @@ async function performScanAsync(scanId, user, config, accessToken) {
 			deleted: deletedCount
 		});
 
-	} catch (error) {
-		errorLog(`Scan ${scanId} failed`, error);
-		await failScan(scanId, error);
+	} catch (scanError) {
+		errorLog(`Scan ${scanId} failed`, scanError);
+		await failScan(scanId, scanError);
 	}
 }

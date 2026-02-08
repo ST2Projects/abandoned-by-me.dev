@@ -21,8 +21,8 @@ export async function load({ params, fetch }) {
 			config: data.config,
 			user: data.user,
 			meta: {
-				title: `${data.user.username}'s Abandoned Repositories`,
-				description: `Public dashboard showing ${data.user.username}'s abandoned GitHub repositories`
+				title: `${slug}'s Abandoned Repositories`,
+				description: `Public dashboard showing ${slug}'s abandoned GitHub repositories`
 			}
 		};
 

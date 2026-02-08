@@ -1,10 +1,9 @@
-import { requireAuth } from '$lib/auth/guards.js';
+import { redirect } from '@sveltejs/kit';
 
-export async function load({ url }) {
-	// Require authentication to access config page
-	const { session } = await requireAuth(url);
-	
-	return {
-		session
-	};
+export async function load({ parent }) {
+	const { session } = await parent();
+	if (!session?.user) {
+		throw redirect(302, '/login');
+	}
+	return { session };
 }

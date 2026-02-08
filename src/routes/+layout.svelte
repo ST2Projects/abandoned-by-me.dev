@@ -11,7 +11,19 @@
 	</main>
 
 	<footer>
-		<p>visit <a href="https://kit.svelte.dev">kit.svelte.dev</a> to learn SvelteKit</p>
+		<div class="footer-inner">
+			<div class="footer-brand">
+				<span class="footer-logo">🪦 abandoned<span class="accent">by.me</span></span>
+				<p>Proudly displaying unfinished business since 2026</p>
+			</div>
+			<div class="footer-links">
+				<a href="/about">About</a>
+				<a href="https://github.com" target="_blank" rel="noopener noreferrer">GitHub</a>
+			</div>
+			<div class="footer-privacy">
+				No tracking. No analytics. No judgment (okay, a little judgment).
+			</div>
+		</div>
 	</footer>
 </div>
 
@@ -24,30 +36,55 @@
 
 	main {
 		flex: 1;
-		display: flex;
-		flex-direction: column;
-		padding: 1rem;
-		width: 100%;
-		max-width: 64rem;
-		margin: 0 auto;
-		box-sizing: border-box;
 	}
 
 	footer {
+		border-top: 1px solid var(--color-border);
+		padding: 2.5rem 1.5rem;
+		margin-top: auto;
+	}
+
+	.footer-inner {
+		max-width: var(--max-width);
+		margin: 0 auto;
+		text-align: center;
+	}
+
+	.footer-logo {
+		font-weight: 700;
+		font-size: 1rem;
+		color: var(--color-text-primary);
+	}
+
+	.accent {
+		color: var(--color-accent-purple);
+	}
+
+	.footer-brand p {
+		font-size: 0.85rem;
+		color: var(--color-text-muted);
+		margin: 0.5rem 0 0;
+	}
+
+	.footer-links {
 		display: flex;
-		flex-direction: column;
+		gap: 1.5rem;
 		justify-content: center;
-		align-items: center;
-		padding: 12px;
+		margin: 1rem 0;
 	}
 
-	footer a {
-		font-weight: bold;
+	.footer-links a {
+		color: var(--color-text-secondary);
+		font-size: 0.85rem;
 	}
 
-	@media (min-width: 480px) {
-		footer {
-			padding: 12px 0;
-		}
+	.footer-links a:hover {
+		color: var(--color-accent-purple);
+	}
+
+	.footer-privacy {
+		font-size: 0.8rem;
+		color: var(--color-text-muted);
+		font-style: italic;
 	}
 </style>

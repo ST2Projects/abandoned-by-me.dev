@@ -3,8 +3,8 @@ FROM node:18-alpine AS base
 
 # Install dependencies only when needed
 FROM base AS deps
-# Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
-RUN apk add --no-cache libc6-compat
+# libc6-compat needed for Alpine, python3/make/g++ needed for native modules (better-sqlite3)
+RUN apk add --no-cache libc6-compat python3 make g++
 WORKDIR /app
 
 # Copy package files
@@ -13,6 +13,7 @@ RUN npm ci --only=production
 
 # Build the application
 FROM base AS builder
+RUN apk add --no-cache libc6-compat python3 make g++
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
@@ -31,6 +32,9 @@ ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 sveltekit
 
+# Create data directory for SQLite database
+RUN mkdir -p /app/data && chown sveltekit:nodejs /app/data
+
 # Copy built application
 COPY --from=builder --chown=sveltekit:nodejs /app/build ./build
 COPY --from=builder --chown=sveltekit:nodejs /app/start.js ./start.js
@@ -43,6 +47,7 @@ EXPOSE 3456
 
 ENV HOST=0.0.0.0
 ENV PORT=3456
+ENV DATABASE_URL=/app/data/app.db
 
 # Start the application
 CMD ["node", "start.js"]

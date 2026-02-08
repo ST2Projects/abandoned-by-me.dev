@@ -1,81 +1,67 @@
 @import '@fontsource/fira-mono';
 
 :root {
-	--font-body: Arial, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu,
+	/* Cemetery theme colors */
+	--color-bg-dark: #0d1117;
+	--color-bg-card: #161b22;
+	--color-bg-card-hover: #1c2129;
+	--color-bg-surface: #21262d;
+	--color-border: #30363d;
+	--color-border-light: #21262d;
+	--color-text-primary: #e6edf3;
+	--color-text-secondary: #8b949e;
+	--color-text-muted: #484f58;
+	--color-accent-purple: #8b5cf6;
+	--color-accent-purple-dim: #6d28d9;
+	--color-accent-green: #3fb950;
+	--color-accent-red: #f85149;
+	--color-accent-orange: #d29922;
+	--color-accent-blue: #58a6ff;
+	--color-accent-pink: #db61a2;
+
+	/* Typography */
+	--font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu,
 		Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
 	--font-mono: 'Fira Mono', monospace;
-	--color-bg-0: rgb(202, 216, 228);
-	--color-bg-1: hsl(209, 36%, 86%);
-	--color-bg-2: hsl(224, 44%, 95%);
-	--color-theme-1: #ff3e00;
-	--color-theme-2: #4075a6;
-	--color-text: rgba(0, 0, 0, 0.7);
-	--column-width: 42rem;
-	--column-margin-top: 4rem;
+
+	/* Spacing */
+	--max-width: 1200px;
+
 	font-family: var(--font-body);
-	color: var(--color-text);
+	color: var(--color-text-primary);
+}
+
+* {
+	box-sizing: border-box;
 }
 
 body {
 	min-height: 100vh;
 	margin: 0;
-	background-attachment: fixed;
-	background-color: var(--color-bg-1);
-	background-size: 100vw 100vh;
-	background-image: radial-gradient(
-			50% 50% at 50% 50%,
-			rgba(255, 255, 255, 0.75) 0%,
-			rgba(255, 255, 255, 0) 100%
-		),
-		linear-gradient(180deg, var(--color-bg-0) 0%, var(--color-bg-1) 15%, var(--color-bg-2) 50%);
+	background-color: var(--color-bg-dark);
+	color: var(--color-text-primary);
 }
 
-h1,
-h2,
-p {
-	font-weight: 400;
+h1, h2, h3, h4, h5, h6 {
+	font-weight: 600;
+	color: var(--color-text-primary);
+	margin-top: 0;
 }
 
 p {
-	line-height: 1.5;
+	line-height: 1.6;
+	color: var(--color-text-secondary);
 }
 
 a {
-	color: var(--color-theme-1);
+	color: var(--color-accent-purple);
 	text-decoration: none;
+	transition: color 0.2s;
 }
 
 a:hover {
+	color: var(--color-accent-blue);
 	text-decoration: underline;
-}
-
-h1 {
-	font-size: 2rem;
-	text-align: center;
-}
-
-h2 {
-	font-size: 1rem;
-}
-
-pre {
-	font-size: 16px;
-	font-family: var(--font-mono);
-	background-color: rgba(255, 255, 255, 0.45);
-	border-radius: 3px;
-	box-shadow: 2px 2px 6px rgb(255 255 255 / 25%);
-	padding: 0.5em;
-	overflow-x: auto;
-	color: var(--color-text);
-}
-
-.text-column {
-	display: flex;
-	max-width: 48rem;
-	flex: 0.6;
-	flex-direction: column;
-	justify-content: center;
-	margin: 0 auto;
 }
 
 input,
@@ -86,12 +72,6 @@ button {
 
 button:focus:not(:focus-visible) {
 	outline: none;
-}
-
-@media (min-width: 720px) {
-	h1 {
-		font-size: 2.4rem;
-	}
 }
 
 .visually-hidden {

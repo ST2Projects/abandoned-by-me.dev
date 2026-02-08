@@ -1,31 +1,31 @@
-import { db, repositories, users, userConfigs } from './drizzle.js';
+import { db, repositories, userConfigs } from './drizzle.js';
 import { eq, and, lt, isNull, or, notInArray, desc, sql } from 'drizzle-orm';
 import { debugLog, errorLog } from '../utils/env.js';
 
 /**
  * @typedef {Object} Repository
  * @property {string} id
- * @property {string} user_id
- * @property {number} github_id
+ * @property {string} userId
+ * @property {number} githubId
  * @property {string} name
- * @property {string} full_name
+ * @property {string} fullName
  * @property {string|null} description
  * @property {boolean} private
- * @property {string} html_url
- * @property {string|null} clone_url
- * @property {string|null} last_commit_date
- * @property {string|null} last_push_date
- * @property {boolean} is_fork
- * @property {boolean} is_archived
- * @property {string} default_branch
+ * @property {string} htmlUrl
+ * @property {string|null} cloneUrl
+ * @property {Date|null} lastCommitDate
+ * @property {Date|null} lastPushDate
+ * @property {boolean} isFork
+ * @property {boolean} isArchived
+ * @property {string} defaultBranch
  * @property {string|null} language
- * @property {number} stars_count
- * @property {number} forks_count
- * @property {number} open_issues_count
- * @property {number} size_kb
- * @property {string} created_at
- * @property {string} updated_at
- * @property {string} last_scanned_at
+ * @property {number} starsCount
+ * @property {number} forksCount
+ * @property {number} openIssuesCount
+ * @property {number} sizeKb
+ * @property {Date} createdAt
+ * @property {Date} updatedAt
+ * @property {Date} lastScannedAt
  */
 
 /**
@@ -85,11 +85,11 @@ export async function upsertRepositories(userId, repositoryList) {
 					openIssuesCount: sql`excluded.open_issues_count`,
 					sizeKb: sql`excluded.size_kb`,
 					lastScannedAt: sql`excluded.last_scanned_at`,
-					updatedAt: sql`NOW()`,
+					updatedAt: new Date(),
 				}
 			})
 			.returning();
-		
+
 		debugLog(`Upserted ${result.length} repositories for user ${userId}`);
 		return result;
 	} catch (error) {
@@ -124,7 +124,7 @@ export async function getUserRepositories(userId) {
  * @param {number} abandonmentThresholdMonths - Months to consider abandoned
  * @returns {Promise<Repository[]>} Abandoned repositories
  */
-export async function getAbandonedRepositories(userId, abandonmentThresholdMonths = 6) {
+export async function getAbandonedRepositories(userId, abandonmentThresholdMonths = 1) {
 	try {
 		const thresholdDate = new Date();
 		thresholdDate.setMonth(thresholdDate.getMonth() - abandonmentThresholdMonths);
@@ -159,21 +159,9 @@ export async function getAbandonedRepositories(userId, abandonmentThresholdMonth
  */
 export async function getPublicDashboardData(dashboardSlug, abandonmentThresholdMonths) {
 	try {
-		// First get the user config and user info
 		const result = await db
-			.select({
-				id: userConfigs.id,
-				userId: userConfigs.userId,
-				abandonmentThresholdMonths: userConfigs.abandonmentThresholdMonths,
-				dashboardPublic: userConfigs.dashboardPublic,
-				dashboardSlug: userConfigs.dashboardSlug,
-				scanPrivateRepos: userConfigs.scanPrivateRepos,
-				createdAt: userConfigs.createdAt,
-				updatedAt: userConfigs.updatedAt,
-				username: users.username
-			})
+			.select()
 			.from(userConfigs)
-			.innerJoin(users, eq(userConfigs.userId, users.id))
 			.where(
 				and(
 					eq(userConfigs.dashboardSlug, dashboardSlug),
@@ -183,17 +171,16 @@ export async function getPublicDashboardData(dashboardSlug, abandonmentThreshold
 			.limit(1);
 
 		if (result.length === 0) {
-			return null; // Not found
+			return null;
 		}
 
 		const configData = result[0];
-		const threshold = abandonmentThresholdMonths || configData.abandonmentThresholdMonths;
-		const repositoriesList = await getAbandonedRepositories(configData.userId, threshold);
+		const repositoriesList = await getUserRepositories(configData.userId);
 
 		return {
-			repositories: repositoriesList.filter(repo => !repo.private), // Only public repos for public dashboard
+			repositories: repositoriesList.filter(repo => !repo.private),
 			config: configData,
-			user: { id: configData.userId, username: configData.username }
+			user: { id: configData.userId }
 		};
 	} catch (error) {
 		errorLog('Error fetching public dashboard data', error);
@@ -210,21 +197,19 @@ export async function getPublicDashboardData(dashboardSlug, abandonmentThreshold
 export async function cleanupRemovedRepositories(userId, currentGithubIds) {
 	try {
 		if (currentGithubIds.length === 0) {
-			// If no current repos, delete all repositories for this user
 			const result = await db
 				.delete(repositories)
 				.where(eq(repositories.userId, userId))
 				.returning({ id: repositories.id });
-			
+
 			const deletedCount = result.length;
 			if (deletedCount > 0) {
 				debugLog(`Cleaned up ${deletedCount} removed repositories for user ${userId}`);
 			}
-			
+
 			return deletedCount;
 		}
 
-		// Delete repositories not in the current GitHub IDs list
 		const result = await db
 			.delete(repositories)
 			.where(
@@ -234,12 +219,12 @@ export async function cleanupRemovedRepositories(userId, currentGithubIds) {
 				)
 			)
 			.returning({ id: repositories.id });
-		
+
 		const deletedCount = result.length;
 		if (deletedCount > 0) {
 			debugLog(`Cleaned up ${deletedCount} removed repositories for user ${userId}`);
 		}
-		
+
 		return deletedCount;
 	} catch (error) {
 		errorLog('Error cleaning up removed repositories', error);

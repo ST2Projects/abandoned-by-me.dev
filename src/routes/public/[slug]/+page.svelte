@@ -1,46 +1,78 @@
 <script>
+	import { calculateBadgeStats, getEarnedBadges, getSarcasticMessage, getUserTitle, getNextTitle, getLanguageBadges, getLanguageStats } from '$lib/utils/badges.js';
+
 	/** @type {import('./$types').PageData} */
 	export let data;
 
-	function formatDate(dateString) {
-		if (!dateString) return 'Never';
-		return new Date(dateString).toLocaleDateString('en-US', {
-			year: 'numeric',
-			month: 'short',
-			day: 'numeric'
-		});
-	}
-
-	function getDaysSince(dateString) {
-		if (!dateString) return null;
-		const date = new Date(dateString);
-		const now = new Date();
-		const diffTime = Math.abs(now - date);
-		const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-		return diffDays;
-	}
-
-	function formatDaysSince(dateString) {
-		const days = getDaysSince(dateString);
-		if (!days) return '';
-		
-		if (days < 30) {
-			return `${days} days ago`;
-		} else if (days < 365) {
-			const months = Math.floor(days / 30);
-			return `${months} month${months > 1 ? 's' : ''} ago`;
-		} else {
-			const years = Math.floor(days / 365);
-			return `${years} year${years > 1 ? 's' : ''} ago`;
-		}
-	}
-
-	$: publicRepositories = data.repositories.filter(repo => !repo.private);
-	$: totalStats = {
-		total: publicRepositories.length,
-		withCommits: publicRepositories.filter(r => r.last_commit_date).length,
-		withoutCommits: publicRepositories.filter(r => !r.last_commit_date).length
+	const langColors = {
+		JavaScript: '#f1e05a', TypeScript: '#3178c6', Python: '#3572A5',
+		Java: '#b07219', Go: '#00ADD8', Rust: '#dea584', Ruby: '#701516',
+		PHP: '#4F5D95', 'C#': '#178600', C: '#555555', 'C++': '#f34b7d',
+		Swift: '#F05138', Kotlin: '#A97BFF', HTML: '#e34c26', CSS: '#563d7c',
+		Shell: '#89e051', Vue: '#41b883', Svelte: '#ff3e00',
 	};
+
+	function getLanguageColor(lang) { return langColors[lang] || '#8b949e'; }
+
+	function timeAgo(dateString) {
+		if (!dateString) return 'Never';
+		const days = Math.floor((new Date() - new Date(dateString)) / (1000 * 60 * 60 * 24));
+		if (days === 0) return 'Today';
+		if (days === 1) return 'Yesterday';
+		if (days < 30) return `${days}d ago`;
+		if (days < 365) return `${Math.floor(days / 30)}mo ago`;
+		return `${Math.floor(days / 365)}y ago`;
+	}
+
+	// Track respects counts locally so we can update after POST
+	let respectsCounts = {};
+	let respectedRepos = {};
+
+	$: publicRepos = data.repositories.filter(repo => !repo.private);
+	$: thresholdMonths = data.config?.abandonmentThresholdMonths || 6;
+
+	$: abandonedRepos = publicRepos.filter(repo => {
+		if (repo.isArchived) return false;
+		const thresholdDate = new Date();
+		thresholdDate.setMonth(thresholdDate.getMonth() - thresholdMonths);
+		const lastActivity = repo.lastCommitDate || repo.lastPushDate;
+		if (!lastActivity) return true;
+		return new Date(lastActivity) < thresholdDate;
+	});
+
+	$: activeRepos = publicRepos.filter(repo => !abandonedRepos.some(a => a.id === repo.id));
+	$: earnedBadges = getEarnedBadges(publicRepos, thresholdMonths);
+	$: languageBadges = getLanguageBadges(publicRepos, thresholdMonths);
+	$: allBadges = [...earnedBadges, ...languageBadges];
+	$: sarcasticMessage = getSarcasticMessage(abandonedRepos.length, publicRepos.length);
+	$: abandonmentRate = publicRepos.length > 0
+		? Math.round((abandonedRepos.length / publicRepos.length) * 100)
+		: 0;
+	$: userTitle = getUserTitle(abandonedRepos.length);
+	$: nextTitle = getNextTitle(abandonedRepos.length);
+	$: langStats = getLanguageStats(publicRepos, thresholdMonths);
+
+	function isAbandoned(repo) {
+		return abandonedRepos.some(a => a.id === repo.id);
+	}
+
+	function getRespectsCount(repo) {
+		return respectsCounts[repo.id] ?? repo.respectsCount ?? 0;
+	}
+
+	async function payRespects(repo) {
+		if (respectedRepos[repo.id]) return;
+		try {
+			const res = await fetch(`/api/repos/${repo.id}/respect`, { method: 'POST' });
+			if (res.ok) {
+				const result = await res.json();
+				respectsCounts[repo.id] = result.respectsCount;
+				respectedRepos[repo.id] = true;
+			} else if (res.status === 429) {
+				respectedRepos[repo.id] = true;
+			}
+		} catch {}
+	}
 </script>
 
 <svelte:head>
@@ -52,536 +84,560 @@
 	<meta name="twitter:card" content="summary" />
 	<meta name="twitter:title" content={data.meta.title} />
 	<meta name="twitter:description" content={data.meta.description} />
-	<meta name="robots" content="noindex, nofollow" />
 </svelte:head>
 
-<div class="public-dashboard">
-	<header class="dashboard-header">
-		<div class="header-content">
-			<h1>
-				<a href="https://github.com/{data.user.username}" target="_blank" rel="noopener noreferrer" class="username-link">
-					{data.user.username}
-				</a>'s Abandoned Repositories
-			</h1>
-			<p class="subtitle">
-				Public repositories abandoned for more than {data.config.abandonment_threshold_months} months
-			</p>
-			<div class="branding">
-				<a href="/" class="brand-link">Powered by abandoned-by-me.dev</a>
+<div class="public-profile">
+	<header class="profile-header">
+		<div class="profile-info">
+			{#if data.user?.image}
+				<img src={data.user.image} alt="" class="profile-avatar" />
+			{/if}
+			<div>
+				<h1>
+					<a href="https://github.com/{data.slug}" target="_blank" rel="noopener noreferrer">
+						{data.slug}
+					</a>'s Graveyard
+				</h1>
+				<p class="profile-title">{userTitle.emoji} {userTitle.title}</p>
+				<p class="profile-subtitle">{sarcasticMessage}</p>
+				{#if nextTitle}
+					<p class="title-progress">{nextTitle.remaining} more abandoned repo{nextTitle.remaining !== 1 ? 's' : ''} until {nextTitle.nextTitle}</p>
+				{/if}
 			</div>
 		</div>
 	</header>
 
-	{#if publicRepositories.length === 0}
+	{#if publicRepos.length === 0}
 		<div class="empty-state">
-			<div class="empty-content">
-				<h2>🎉 No Abandoned Repositories!</h2>
-				<p>{data.user.username} is actively maintaining all their public repositories.</p>
-				<p class="hint">Check back later or adjust the abandonment threshold.</p>
-			</div>
+			<span class="empty-icon">🎉</span>
+			<h2>No Abandoned Repos!</h2>
+			<p>{data.slug} is actively maintaining all their public repositories. Suspicious.</p>
 		</div>
 	{:else}
-		<div class="stats">
+		<div class="stats-grid">
 			<div class="stat-card">
-				<h3>{totalStats.total}</h3>
-				<p>Abandoned Repositories</p>
+				<span class="stat-value">{publicRepos.length}</span>
+				<span class="stat-label">Total Repos</span>
 			</div>
-			<div class="stat-card">
-				<h3>{totalStats.withCommits}</h3>
-				<p>With Known Last Commit</p>
+			<div class="stat-card stat-abandoned">
+				<span class="stat-value">{abandonedRepos.length}</span>
+				<span class="stat-label">Abandoned</span>
 			</div>
-			{#if totalStats.withoutCommits > 0}
-				<div class="stat-card">
-					<h3>{totalStats.withoutCommits}</h3>
-					<p>Never Committed To</p>
-				</div>
-			{/if}
+			<div class="stat-card stat-active">
+				<span class="stat-value">{activeRepos.length}</span>
+				<span class="stat-label">Active</span>
+			</div>
+			<div class="stat-card stat-rate">
+				<span class="stat-value">{abandonmentRate}%</span>
+				<span class="stat-label">Abandon Rate</span>
+			</div>
 		</div>
 
-		<div class="repositories-section">
-			<div class="section-header">
-				<h2>Abandoned Repositories</h2>
-				<p class="repository-count">{publicRepositories.length} repositories</p>
-			</div>
-			
-			<div class="repositories-grid">
-				{#each publicRepositories as repo}
-					<div class="repo-card">
-						<div class="repo-header">
-							<h3>
-								<a href={repo.html_url} target="_blank" rel="noopener noreferrer" class="repo-link">
-									{repo.name}
-								</a>
-							</h3>
-							<div class="repo-meta">
-								{#if repo.language}
-									<span class="language">{repo.language}</span>
-								{/if}
-								{#if repo.is_fork}
-									<span class="fork-badge">Fork</span>
-								{/if}
+		{#if allBadges.length > 0}
+			<section class="badges-section">
+				<h2>Badges of Dishonor ({allBadges.length})</h2>
+				<div class="badges-list">
+					{#each earnedBadges as badge}
+						<div class="badge-item">
+							<span class="b-icon">{badge.icon}</span>
+							<div class="b-info">
+								<span class="b-name">{badge.name}</span>
+								<span class="b-desc">{badge.description}</span>
 							</div>
+						</div>
+					{/each}
+					{#each languageBadges as badge}
+						<div class="badge-item badge-lang">
+							<span class="b-icon">{badge.emoji}</span>
+							<div class="b-info">
+								<span class="b-name">{badge.name}</span>
+								<span class="b-desc">{badge.description}</span>
+							</div>
+						</div>
+					{/each}
+				</div>
+			</section>
+		{/if}
+
+		{#if langStats.stats.length > 0}
+			<section class="lang-stats-section">
+				<h2>Language Graveyard</h2>
+				{#if langStats.mostAbandoned}
+					<p class="lang-summary">
+						Most abandoned language: <strong>{langStats.mostAbandoned}</strong>
+						({langStats.stats.find(s => s.language === langStats.mostAbandoned)?.abandonedCount} repos).
+						{#if langStats.safest && langStats.safest !== langStats.mostAbandoned}
+							Safest language: <strong>{langStats.safest}</strong>
+							({langStats.stats.find(s => s.language === langStats.safest)?.abandonedCount} abandoned).
+						{/if}
+					</p>
+				{/if}
+				<div class="lang-bars">
+					{#each langStats.stats.filter(s => s.abandonedCount > 0) as stat}
+						<div class="lang-bar-row">
+							<span class="lang-bar-label">
+								<span class="lang-dot" style="background:{getLanguageColor(stat.language)}"></span>
+								{stat.language}
+							</span>
+							<div class="lang-bar-track">
+								<div
+									class="lang-bar-fill"
+									style="width:{Math.max(8, stat.percentage)}%; background:{getLanguageColor(stat.language)}"
+								></div>
+							</div>
+							<span class="lang-bar-count">{stat.abandonedCount}/{stat.totalCount}</span>
+						</div>
+					{/each}
+				</div>
+			</section>
+		{/if}
+
+		<section class="repos-section">
+			<h2>Repositories ({publicRepos.length})</h2>
+			<div class="repos-grid">
+				{#each publicRepos as repo}
+					<div class="repo-card" class:abandoned={isAbandoned(repo)}>
+						<div class="repo-top">
+							<a href={repo.htmlUrl} target="_blank" rel="noopener noreferrer" class="repo-name">
+								{repo.name}
+							</a>
+							<span class="status-badge" class:dead={isAbandoned(repo)}>
+								{isAbandoned(repo) ? '🪦 Abandoned' : '💚 Active'}
+							</span>
 						</div>
 
 						{#if repo.description}
-							<p class="repo-description">{repo.description}</p>
+							<p class="repo-desc">{repo.description}</p>
 						{/if}
 
-						<div class="repo-stats">
-							<span class="stat">⭐ {repo.stars_count}</span>
-							<span class="stat">🍴 {repo.forks_count}</span>
-							{#if repo.open_issues_count > 0}
-								<span class="stat">⚠️ {repo.open_issues_count} issues</span>
+						<div class="repo-meta">
+							{#if repo.language}
+								<span class="meta-item">
+									<span class="lang-dot" style="background:{getLanguageColor(repo.language)}"></span>
+									{repo.language}
+								</span>
+							{/if}
+							{#if repo.starsCount > 0}
+								<span class="meta-item">&#9733; {repo.starsCount}</span>
 							{/if}
 						</div>
 
-						<div class="repo-activity">
-							{#if repo.last_commit_date}
-								<div class="activity-item">
-									<strong>Last commit:</strong>
-									<span class="date">
-										{formatDate(repo.last_commit_date)}
-										<span class="relative-date">({formatDaysSince(repo.last_commit_date)})</span>
-									</span>
-								</div>
+						<div class="repo-commit">
+							{#if repo.lastCommitDate}
+								Last commit: {timeAgo(repo.lastCommitDate)}
 							{:else}
-								<div class="activity-item no-commits">
-									<strong>Last commit:</strong>
-									<span class="no-data">No commits found</span>
-								</div>
+								No commits found
 							{/if}
+						</div>
 
-							{#if repo.last_push_date && repo.last_push_date !== repo.last_commit_date}
-								<div class="activity-item">
-									<strong>Last push:</strong>
-									<span class="date">
-										{formatDate(repo.last_push_date)}
-										<span class="relative-date">({formatDaysSince(repo.last_push_date)})</span>
+						{#if isAbandoned(repo)}
+							<div class="repo-respects">
+								<button
+									class="btn-respect"
+									class:respected={respectedRepos[repo.id]}
+									on:click={() => payRespects(repo)}
+									disabled={respectedRepos[repo.id]}
+								>
+									🪦 {respectedRepos[repo.id] ? 'Respected' : 'Pay Respects'}
+								</button>
+								{#if getRespectsCount(repo) > 0}
+									<span class="respect-count">
+										{getRespectsCount(repo)} developer{getRespectsCount(repo) !== 1 ? 's' : ''} paid respects
 									</span>
-								</div>
-							{/if}
-						</div>
-
-						<div class="repo-footer">
-							<a href={repo.html_url} target="_blank" rel="noopener noreferrer" class="view-repo">
-								View on GitHub →
-							</a>
-						</div>
+								{/if}
+							</div>
+						{/if}
 					</div>
 				{/each}
 			</div>
-		</div>
+		</section>
 	{/if}
 
-	<footer class="dashboard-footer">
-		<div class="footer-content">
-			<p class="footer-info">
-				This dashboard shows public repositories that haven't been committed to in {data.config.abandonment_threshold_months} months or more.
-				Data is updated when the repository owner runs a scan.
-			</p>
-			<div class="footer-links">
-				<a href="/" class="footer-link">Create your own dashboard</a>
-				<span class="separator">•</span>
-				<a href="https://github.com" target="_blank" rel="noopener noreferrer" class="footer-link">GitHub</a>
-			</div>
-		</div>
-	</footer>
+	<div class="cta-banner">
+		<p>Powered by <a href="/">abandoned<span class="accent">by.me</span></a></p>
+		<p class="cta-sub">Show off your own abandoned projects</p>
+	</div>
 </div>
 
 <style>
-	.public-dashboard {
-		min-height: 100vh;
-		background: #f8f9fa;
-	}
-
-	.dashboard-header {
-		background: white;
-		border-bottom: 1px solid #e1e4e8;
-		padding: 3rem 0;
-	}
-
-	.header-content {
-		max-width: 1200px;
+	.public-profile {
+		max-width: var(--max-width);
 		margin: 0 auto;
-		padding: 0 2rem;
-		text-align: center;
+		padding: 2rem 1.5rem;
 	}
 
-	.dashboard-header h1 {
-		color: #1a1a1a;
-		font-size: 2.5rem;
-		margin-bottom: 0.5rem;
+	.profile-header {
+		margin-bottom: 2rem;
+		padding-bottom: 2rem;
+		border-bottom: 1px solid var(--color-border);
 	}
 
-	.username-link {
-		color: #0366d6;
+	.profile-info {
+		display: flex;
+		align-items: center;
+		gap: 1.25rem;
+	}
+
+	.profile-avatar {
+		width: 64px;
+		height: 64px;
+		border-radius: 50%;
+		border: 3px solid var(--color-border);
+	}
+
+	.profile-header h1 {
+		font-size: 1.75rem;
+		margin-bottom: 0.25rem;
+	}
+
+	.profile-header h1 a {
+		color: var(--color-accent-purple);
 		text-decoration: none;
 	}
 
-	.username-link:hover {
-		text-decoration: underline;
+	.profile-header h1 a:hover { text-decoration: underline; }
+
+	.profile-title {
+		font-size: 1rem;
+		font-weight: 600;
+		color: var(--color-accent-orange);
+		margin: 0 0 0.25rem;
 	}
 
-	.subtitle {
-		color: #666;
-		font-size: 1.2rem;
-		margin-bottom: 1rem;
+	.profile-subtitle {
+		color: var(--color-text-secondary);
+		font-size: 0.95rem;
+		margin: 0;
 	}
 
-	.branding {
-		margin-top: 2rem;
-	}
-
-	.brand-link {
-		color: #0366d6;
-		text-decoration: none;
-		font-weight: 500;
-		font-size: 0.9rem;
-	}
-
-	.brand-link:hover {
-		text-decoration: underline;
+	.title-progress {
+		font-size: 0.8rem;
+		color: var(--color-text-muted);
+		font-style: italic;
+		margin: 0.25rem 0 0;
 	}
 
 	.empty-state {
-		max-width: 600px;
-		margin: 4rem auto;
-		padding: 0 2rem;
 		text-align: center;
+		padding: 4rem 2rem;
 	}
 
-	.empty-content {
-		background: white;
-		padding: 3rem;
-		border-radius: 1rem;
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-	}
+	.empty-icon { font-size: 3rem; display: block; margin-bottom: 1rem; }
+	.empty-state h2 { margin-bottom: 0.5rem; }
 
-	.empty-content h2 {
-		color: #28a745;
-		margin-bottom: 1rem;
-		font-size: 2rem;
-	}
-
-	.empty-content p {
-		color: #666;
-		line-height: 1.6;
-		margin-bottom: 0.5rem;
-	}
-
-	.empty-content .hint {
-		font-size: 0.9rem;
-		font-style: italic;
-	}
-
-	.stats {
-		max-width: 1200px;
-		margin: 3rem auto 0;
-		padding: 0 2rem;
+	.stats-grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-		gap: 1.5rem;
+		grid-template-columns: repeat(4, 1fr);
+		gap: 1rem;
+		margin-bottom: 2rem;
 	}
 
 	.stat-card {
-		background: white;
-		padding: 2rem;
-		border-radius: 0.75rem;
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+		background: var(--color-bg-card);
+		border: 1px solid var(--color-border);
+		border-radius: 10px;
+		padding: 1.25rem;
 		text-align: center;
-		border-left: 4px solid #d73a49;
 	}
 
-	.stat-card h3 {
-		font-size: 2.5rem;
-		margin: 0;
-		color: #1a1a1a;
+	.stat-value {
+		display: block;
+		font-size: 2rem;
+		font-weight: 800;
+		color: var(--color-text-primary);
 	}
 
-	.stat-card p {
-		margin: 0.5rem 0 0 0;
-		color: #666;
-		font-weight: 600;
-	}
-
-	.repositories-section {
-		max-width: 1200px;
-		margin: 4rem auto;
-		padding: 0 2rem;
-	}
-
-	.section-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: baseline;
-		margin-bottom: 2rem;
-		flex-wrap: wrap;
-		gap: 1rem;
-	}
-
-	.section-header h2 {
-		color: #1a1a1a;
-		margin: 0;
-	}
-
-	.repository-count {
-		color: #666;
-		margin: 0;
+	.stat-label {
+		font-size: 0.8rem;
+		color: var(--color-text-secondary);
 		font-weight: 500;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
 	}
 
-	.repositories-grid {
+	.stat-abandoned .stat-value { color: var(--color-accent-red); }
+	.stat-active .stat-value { color: var(--color-accent-green); }
+	.stat-rate .stat-value { color: var(--color-accent-orange); }
+
+	.badges-section { margin-bottom: 2rem; }
+
+	.badges-section h2 {
+		font-size: 1.25rem;
+		margin-bottom: 1rem;
+	}
+
+	.badges-list {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-		gap: 1.5rem;
+		grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+		gap: 0.75rem;
+	}
+
+	.badge-item {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		background: var(--color-bg-card);
+		border: 1px solid var(--color-border);
+		border-radius: 8px;
+		padding: 0.85rem 1rem;
+	}
+
+	.badge-lang {
+		border-color: rgba(210, 153, 34, 0.3);
+	}
+
+	.b-icon { font-size: 1.5rem; flex-shrink: 0; }
+
+	.b-info {
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
+	}
+
+	.b-name {
+		font-weight: 700;
+		font-size: 0.9rem;
+		color: var(--color-text-primary);
+	}
+
+	.b-desc {
+		font-size: 0.75rem;
+		color: var(--color-text-secondary);
+		line-height: 1.3;
+	}
+
+	/* Language Stats */
+	.lang-stats-section {
+		margin-bottom: 2rem;
+	}
+
+	.lang-stats-section h2 {
+		font-size: 1.25rem;
+		margin-bottom: 0.75rem;
+	}
+
+	.lang-summary {
+		font-size: 0.9rem;
+		color: var(--color-text-secondary);
+		margin-bottom: 1rem;
+	}
+
+	.lang-summary strong {
+		color: var(--color-text-primary);
+	}
+
+	.lang-bars {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.lang-bar-row {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+	}
+
+	.lang-bar-label {
+		font-size: 0.8rem;
+		color: var(--color-text-secondary);
+		min-width: 100px;
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+	}
+
+	.lang-bar-track {
+		flex: 1;
+		height: 8px;
+		background: var(--color-bg-surface);
+		border-radius: 4px;
+		overflow: hidden;
+	}
+
+	.lang-bar-fill {
+		height: 100%;
+		border-radius: 4px;
+		opacity: 0.8;
+		transition: width 0.3s ease;
+	}
+
+	.lang-bar-count {
+		font-size: 0.75rem;
+		color: var(--color-text-muted);
+		min-width: 40px;
+		text-align: right;
+	}
+
+	.repos-section h2 {
+		font-size: 1.25rem;
+		margin-bottom: 1rem;
+	}
+
+	.repos-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+		gap: 1rem;
 	}
 
 	.repo-card {
-		background: white;
-		padding: 1.5rem;
-		border-radius: 0.75rem;
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-		border-left: 4px solid #d73a49;
-		transition: transform 0.2s, shadow 0.2s;
+		background: var(--color-bg-card);
+		border: 1px solid var(--color-border);
+		border-radius: 10px;
+		padding: 1.25rem;
+		border-left: 3px solid var(--color-accent-green);
+		transition: border-color 0.2s;
 	}
 
 	.repo-card:hover {
-		transform: translateY(-2px);
-		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+		border-color: var(--color-accent-purple);
+		border-left-color: var(--color-accent-purple);
 	}
 
-	.repo-header {
+	.repo-card.abandoned { border-left-color: var(--color-accent-red); }
+	.repo-card.abandoned:hover { border-left-color: var(--color-accent-purple); }
+
+	.repo-top {
 		display: flex;
 		justify-content: space-between;
 		align-items: flex-start;
-		margin-bottom: 1rem;
-		gap: 1rem;
+		margin-bottom: 0.5rem;
+		gap: 0.5rem;
 	}
 
-	.repo-header h3 {
-		margin: 0;
-		flex: 1;
-		min-width: 0;
-	}
-
-	.repo-link {
-		color: #0366d6;
+	.repo-name {
+		font-weight: 700;
+		color: var(--color-accent-blue);
+		font-size: 0.95rem;
 		text-decoration: none;
+	}
+
+	.repo-name:hover { text-decoration: underline; }
+
+	.status-badge {
+		font-size: 0.75rem;
 		font-weight: 600;
-		word-break: break-word;
-	}
-
-	.repo-link:hover {
-		text-decoration: underline;
-	}
-
-	.repo-meta {
-		display: flex;
-		flex-direction: column;
-		gap: 0.25rem;
-		align-items: flex-end;
+		white-space: nowrap;
+		color: var(--color-accent-green);
 		flex-shrink: 0;
 	}
 
-	.language {
-		background: #f8f9fa;
-		color: #586069;
-		font-size: 0.8rem;
-		padding: 0.2rem 0.5rem;
-		border-radius: 0.25rem;
-		border: 1px solid #e1e4e8;
-		white-space: nowrap;
-	}
+	.status-badge.dead { color: var(--color-text-muted); }
 
-	.fork-badge {
-		background: #fff3cd;
-		color: #856404;
-		font-size: 0.8rem;
-		padding: 0.2rem 0.5rem;
-		border-radius: 0.25rem;
-		border: 1px solid #ffeaa7;
-		white-space: nowrap;
-	}
-
-	.repo-description {
-		color: #586069;
-		font-size: 0.95rem;
+	.repo-desc {
+		font-size: 0.85rem;
+		color: var(--color-text-secondary);
 		line-height: 1.4;
-		margin-bottom: 1rem;
+		margin-bottom: 0.75rem;
 		display: -webkit-box;
-		-webkit-line-clamp: 3;
+		-webkit-line-clamp: 2;
 		-webkit-box-orient: vertical;
 		overflow: hidden;
 	}
 
-	.repo-stats {
+	.repo-meta {
 		display: flex;
-		gap: 1rem;
-		margin-bottom: 1.5rem;
+		gap: 0.75rem;
+		flex-wrap: wrap;
+		margin-bottom: 0.75rem;
+	}
+
+	.meta-item {
+		font-size: 0.8rem;
+		color: var(--color-text-secondary);
+		display: flex;
+		align-items: center;
+		gap: 0.3rem;
+	}
+
+	.lang-dot {
+		width: 10px;
+		height: 10px;
+		border-radius: 50%;
+		display: inline-block;
+	}
+
+	.repo-commit {
+		border-top: 1px solid var(--color-border-light);
+		padding-top: 0.6rem;
+		font-size: 0.8rem;
+		color: var(--color-text-muted);
+	}
+
+	/* Respects */
+	.repo-respects {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		margin-top: 0.6rem;
+		padding-top: 0.6rem;
+		border-top: 1px solid var(--color-border-light);
 		flex-wrap: wrap;
 	}
 
-	.stat {
-		font-size: 0.875rem;
-		color: #586069;
-		white-space: nowrap;
-	}
-
-	.repo-activity {
-		border-top: 1px solid #e1e4e8;
-		padding-top: 1rem;
-		margin-bottom: 1rem;
-		space-y: 0.5rem;
-	}
-
-	.activity-item {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		font-size: 0.875rem;
-		margin-bottom: 0.5rem;
-		gap: 1rem;
-	}
-
-	.activity-item:last-child {
-		margin-bottom: 0;
-	}
-
-	.activity-item strong {
-		color: #24292e;
+	.btn-respect {
+		background: rgba(139, 92, 246, 0.1);
+		color: var(--color-accent-purple);
+		border: 1px solid rgba(139, 92, 246, 0.3);
+		padding: 0.3rem 0.65rem;
+		border-radius: 6px;
+		font-size: 0.75rem;
+		font-weight: 600;
+		cursor: pointer;
+		transition: background 0.2s;
 		flex-shrink: 0;
 	}
 
-	.date {
-		text-align: right;
-		color: #586069;
+	.btn-respect:hover:not(:disabled) {
+		background: rgba(139, 92, 246, 0.2);
 	}
 
-	.relative-date {
-		display: block;
-		font-size: 0.8rem;
-		color: #959da5;
-		margin-top: 0.1rem;
+	.btn-respect.respected {
+		opacity: 0.6;
+		cursor: default;
 	}
 
-	.no-commits .no-data {
-		color: #d73a49;
+	.respect-count {
+		font-size: 0.75rem;
+		color: var(--color-text-muted);
 		font-style: italic;
 	}
 
-	.repo-footer {
-		border-top: 1px solid #e1e4e8;
-		padding-top: 1rem;
-		text-align: right;
-	}
-
-	.view-repo {
-		color: #0366d6;
-		text-decoration: none;
-		font-weight: 500;
-		font-size: 0.9rem;
-	}
-
-	.view-repo:hover {
-		text-decoration: underline;
-	}
-
-	.dashboard-footer {
-		background: white;
-		border-top: 1px solid #e1e4e8;
-		padding: 2rem 0;
-		margin-top: 4rem;
-	}
-
-	.footer-content {
-		max-width: 1200px;
-		margin: 0 auto;
-		padding: 0 2rem;
+	.cta-banner {
+		margin-top: 3rem;
+		padding: 1.5rem;
 		text-align: center;
+		background: var(--color-bg-card);
+		border: 1px solid var(--color-border);
+		border-radius: 10px;
 	}
 
-	.footer-info {
-		color: #666;
+	.cta-banner p:first-child {
+		color: var(--color-text-secondary);
 		font-size: 0.9rem;
-		line-height: 1.5;
-		margin-bottom: 1rem;
+		margin: 0 0 0.25rem;
 	}
 
-	.footer-links {
-		display: flex;
-		justify-content: center;
-		align-items: center;
-		gap: 1rem;
-		flex-wrap: wrap;
-	}
-
-	.footer-link {
-		color: #0366d6;
+	.cta-banner a {
+		color: var(--color-text-primary);
+		font-weight: 700;
 		text-decoration: none;
-		font-size: 0.9rem;
 	}
 
-	.footer-link:hover {
-		text-decoration: underline;
-	}
+	.cta-banner a:hover { text-decoration: underline; }
 
-	.separator {
-		color: #d1d5da;
+	.accent { color: var(--color-accent-purple); }
+
+	.cta-sub {
+		color: var(--color-text-muted);
+		font-size: 0.8rem;
+		margin: 0;
 	}
 
 	@media (max-width: 768px) {
-		.dashboard-header {
-			padding: 2rem 0;
-		}
-
-		.header-content {
-			padding: 0 1rem;
-		}
-
-		.dashboard-header h1 {
-			font-size: 2rem;
-		}
-
-		.stats, .repositories-section {
-			padding: 0 1rem;
-		}
-
-		.repositories-grid {
-			grid-template-columns: 1fr;
-		}
-
-		.repo-header {
-			flex-direction: column;
-			align-items: flex-start;
-			gap: 0.5rem;
-		}
-
-		.repo-meta {
-			flex-direction: row;
-			align-items: flex-start;
-		}
-
-		.activity-item {
-			flex-direction: column;
-			align-items: flex-start;
-			gap: 0.25rem;
-		}
-
-		.date {
-			text-align: left;
-		}
-
-		.footer-content {
-			padding: 0 1rem;
-		}
-
-		.footer-links {
-			flex-direction: column;
-			gap: 0.5rem;
-		}
-
-		.separator {
-			display: none;
-		}
+		.profile-info { flex-direction: column; text-align: center; }
+		.stats-grid { grid-template-columns: repeat(2, 1fr); }
+		.repos-grid { grid-template-columns: 1fr; }
+		.badges-list { grid-template-columns: 1fr; }
 	}
 </style>

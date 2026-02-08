@@ -25,27 +25,25 @@ export async function GET({ params }) {
 		return json({
 			repositories: publicRepositories,
 			config: {
-				abandonment_threshold_months: dashboardData.config.abandonment_threshold_months,
-				dashboard_slug: dashboardData.config.dashboard_slug
+				abandonmentThresholdMonths: dashboardData.config.abandonmentThresholdMonths,
+				dashboardSlug: dashboardData.config.dashboardSlug
 			},
 			user: {
-				username: dashboardData.user.username
+				id: dashboardData.user.id
 			},
 			stats: {
 				total: publicRepositories.length,
-				lastUpdated: dashboardData.repositories.length > 0 
-					? Math.max(...dashboardData.repositories.map(r => new Date(r.last_scanned_at).getTime()))
+				lastUpdated: dashboardData.repositories.length > 0
+					? Math.max(...dashboardData.repositories.map(r => new Date(r.lastScannedAt).getTime()))
 					: null
 			}
 		});
 
 	} catch (err) {
-		errorLog('Error fetching public dashboard', err);
-		
 		if (err.status) {
-			throw err; // Re-throw SvelteKit errors
+			throw err;
 		}
-		
+		errorLog('Error fetching public dashboard', err);
 		throw error(500, 'Failed to fetch dashboard data');
 	}
 }

@@ -1,34 +1,26 @@
 import { error, json } from '@sveltejs/kit';
-import { getCurrentSession } from '$lib/auth/session.js';
-import { getUserByUsername } from '$lib/database/users.js';
+import { auth } from '$lib/auth/auth.js';
 import { getUserConfig, updateUserConfig, enablePublicDashboard, disablePublicDashboard } from '$lib/database/userConfig.js';
 import { errorLog } from '$lib/utils/env.js';
+import { configLimiter } from '$lib/utils/rateLimit.js';
 
 /**
  * Gets user configuration
  */
-export async function GET() {
+export async function GET({ request }) {
 	try {
-		// Check authentication
-		const session = await getCurrentSession();
-		if (!session || !session.username) {
+		const session = await auth.api.getSession({ headers: request.headers });
+		if (!session?.user) {
 			throw error(401, 'Authentication required');
 		}
 
-		// Get user from database
-		const user = await getUserByUsername(session.username);
-		if (!user) {
-			throw error(404, 'User not found');
-		}
-
-		// Get user configuration
-		const config = await getUserConfig(user.id);
-
+		const config = await getUserConfig(session.user.id);
 		return json(config);
 
 	} catch (err) {
+		if (err.status) throw err;
 		errorLog('Error fetching user config', err);
-		throw error(500, err.message || 'Failed to fetch configuration');
+		throw error(500, 'Failed to fetch configuration');
 	}
 }
 
@@ -37,48 +29,63 @@ export async function GET() {
  */
 export async function POST({ request }) {
 	try {
-		// Check authentication
-		const session = await getCurrentSession();
-		if (!session || !session.username) {
+		const session = await auth.api.getSession({ headers: request.headers });
+		if (!session?.user) {
 			throw error(401, 'Authentication required');
 		}
 
-		// Get user from database
-		const user = await getUserByUsername(session.username);
-		if (!user) {
-			throw error(404, 'User not found');
+		// Validate session has not expired
+		if (session.session?.expiresAt && new Date(session.session.expiresAt) < new Date()) {
+			throw error(401, 'Session expired. Please sign in again.');
 		}
+
+		// Rate limit config updates per user
+		const rateCheck = configLimiter.check(session.user.id);
+		if (!rateCheck.allowed) {
+			return json(
+				{ error: 'Too many requests. Please try again later.' },
+				{ status: 429, headers: { 'Retry-After': String(rateCheck.retryAfter) } }
+			);
+		}
+
+		const userId = session.user.id;
+		const username = session.user.name || session.user.email;
 
 		// Parse request body
 		const updates = await request.json();
 
 		// Validate updates
-		if (updates.abandonment_threshold_months !== undefined) {
-			const threshold = parseInt(updates.abandonment_threshold_months);
+		if (updates.abandonmentThresholdMonths !== undefined) {
+			const threshold = parseInt(updates.abandonmentThresholdMonths);
 			if (isNaN(threshold) || threshold < 1 || threshold > 60) {
 				throw error(400, 'Abandonment threshold must be between 1 and 60 months');
 			}
-			updates.abandonment_threshold_months = threshold;
+			updates.abandonmentThresholdMonths = threshold;
 		}
 
-		// Handle public dashboard toggle
-		if (updates.dashboard_public !== undefined) {
-			if (updates.dashboard_public) {
-				const config = await enablePublicDashboard(user.id, session.username);
-				return json(config);
+		// Handle public dashboard toggle first (it manages its own fields)
+		if (updates.dashboardPublic !== undefined) {
+			if (updates.dashboardPublic) {
+				await enablePublicDashboard(userId, username);
 			} else {
-				const config = await disablePublicDashboard(user.id);
-				return json(config);
+				await disablePublicDashboard(userId);
 			}
+			// Remove dashboardPublic from updates so it's not applied again
+			delete updates.dashboardPublic;
 		}
 
-		// Update configuration
-		const updatedConfig = await updateUserConfig(user.id, updates);
+		// Apply remaining configuration updates (e.g., abandonmentThresholdMonths, scanPrivateRepos)
+		if (Object.keys(updates).length > 0) {
+			await updateUserConfig(userId, updates);
+		}
 
+		// Return the latest config state
+		const updatedConfig = await getUserConfig(userId);
 		return json(updatedConfig);
 
 	} catch (err) {
+		if (err.status) throw err;
 		errorLog('Error updating user config', err);
-		throw error(500, err.message || 'Failed to update configuration');
+		throw error(500, 'Failed to update configuration');
 	}
 }

@@ -166,7 +166,7 @@ export async function analyzeRepositories(client, repositories, onProgress) {
  * @param {number} thresholdMonths - Months to consider abandoned
  * @returns {boolean} Whether the repository is abandoned
  */
-export function isRepositoryAbandoned(repository, thresholdMonths = 6) {
+export function isRepositoryAbandoned(repository, thresholdMonths = 1) {
 	if (repository.is_archived) {
 		return false; // Archived repos are intentionally inactive
 	}

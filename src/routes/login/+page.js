@@ -1,8 +1,9 @@
-import { requireGuest } from '$lib/auth/guards.js';
+import { redirect } from '@sveltejs/kit';
 
-export async function load() {
-	// Redirect to dashboard if already logged in
-	await requireGuest();
-	
+export async function load({ parent }) {
+	const { session } = await parent();
+	if (session?.user) {
+		throw redirect(302, '/dashboard');
+	}
 	return {};
 }

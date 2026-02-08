@@ -3,9 +3,9 @@ import { defineConfig } from 'drizzle-kit';
 export default defineConfig({
 	schema: './src/lib/database/schema.js',
 	out: './drizzle',
-	driver: 'pg',
+	dialect: 'sqlite',
 	dbCredentials: {
-		connectionString: process.env.DATABASE_URL || 'postgresql://postgres:password@localhost:5432/abandoned_by_me',
+		url: process.env.DATABASE_URL || './data/app.db',
 	},
 	verbose: true,
 	strict: true,

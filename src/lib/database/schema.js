@@ -1,31 +1,76 @@
-import { pgTable, text, uuid, timestamp, boolean, integer, jsonb, pgEnum, uniqueIndex, index } from 'drizzle-orm/pg-core';
-import { sql } from 'drizzle-orm';
+import { sqliteTable, text, integer, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
 
-// Enum for scan status
-export const scanStatusEnum = pgEnum('scan_status', ['running', 'completed', 'failed']);
+// ============================================================
+// better-auth managed tables
+// These tables are required by better-auth for authentication.
+// The table and column names must match what better-auth expects.
+// ============================================================
 
-// Users table
-export const users = pgTable('users', {
-	id: uuid('id').primaryKey().defaultRandom(),
-	username: text('username').unique().notNull(),
-	accessToken: text('access_token').notNull(),
-	refreshToken: text('refresh_token'),
-	accessTokenExpiresIn: text('access_token_expires_in'),
-	refreshTokenExpiresIn: text('refresh_token_expires_in'),
-	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+// better-auth: user table
+export const user = sqliteTable('user', {
+	id: text('id').primaryKey(),
+	name: text('name').notNull(),
+	email: text('email').notNull().unique(),
+	emailVerified: integer('emailVerified', { mode: 'boolean' }).notNull().default(false),
+	image: text('image'),
+	createdAt: integer('createdAt', { mode: 'timestamp' }).notNull(),
+	updatedAt: integer('updatedAt', { mode: 'timestamp' }).notNull(),
 });
 
+// better-auth: session table
+export const session = sqliteTable('session', {
+	id: text('id').primaryKey(),
+	expiresAt: integer('expiresAt', { mode: 'timestamp' }).notNull(),
+	token: text('token').notNull().unique(),
+	createdAt: integer('createdAt', { mode: 'timestamp' }).notNull(),
+	updatedAt: integer('updatedAt', { mode: 'timestamp' }).notNull(),
+	ipAddress: text('ipAddress'),
+	userAgent: text('userAgent'),
+	userId: text('userId').notNull().references(() => user.id, { onDelete: 'cascade' }),
+});
+
+// better-auth: account table
+export const account = sqliteTable('account', {
+	id: text('id').primaryKey(),
+	accountId: text('accountId').notNull(),
+	providerId: text('providerId').notNull(),
+	userId: text('userId').notNull().references(() => user.id, { onDelete: 'cascade' }),
+	accessToken: text('accessToken'),
+	refreshToken: text('refreshToken'),
+	idToken: text('idToken'),
+	accessTokenExpiresAt: integer('accessTokenExpiresAt', { mode: 'timestamp' }),
+	refreshTokenExpiresAt: integer('refreshTokenExpiresAt', { mode: 'timestamp' }),
+	scope: text('scope'),
+	password: text('password'),
+	createdAt: integer('createdAt', { mode: 'timestamp' }).notNull(),
+	updatedAt: integer('updatedAt', { mode: 'timestamp' }).notNull(),
+});
+
+// better-auth: verification table
+export const verification = sqliteTable('verification', {
+	id: text('id').primaryKey(),
+	identifier: text('identifier').notNull(),
+	value: text('value').notNull(),
+	expiresAt: integer('expiresAt', { mode: 'timestamp' }).notNull(),
+	createdAt: integer('createdAt', { mode: 'timestamp' }).notNull(),
+	updatedAt: integer('updatedAt', { mode: 'timestamp' }).notNull(),
+});
+
+// ============================================================
+// Application tables
+// ============================================================
+
 // User configurations table
-export const userConfigs = pgTable('user_configs', {
-	id: uuid('id').primaryKey().defaultRandom(),
-	userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-	abandonmentThresholdMonths: integer('abandonment_threshold_months').default(6).notNull(),
-	dashboardPublic: boolean('dashboard_public').default(false).notNull(),
+export const userConfigs = sqliteTable('user_configs', {
+	id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+	userId: text('user_id').notNull(),
+	abandonmentThresholdMonths: integer('abandonment_threshold_months').default(1).notNull(),
+	dashboardPublic: integer('dashboard_public', { mode: 'boolean' }).default(false).notNull(),
 	dashboardSlug: text('dashboard_slug').unique(),
-	scanPrivateRepos: boolean('scan_private_repos').default(false).notNull(),
-	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+	scanPrivateRepos: integer('scan_private_repos', { mode: 'boolean' }).default(false).notNull(),
+	autoRefresh: integer('auto_refresh', { mode: 'boolean' }).notNull().default(false),
+	createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+	updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
 }, (table) => {
 	return {
 		userIdUnique: uniqueIndex('user_configs_user_id_unique').on(table.userId),
@@ -34,29 +79,31 @@ export const userConfigs = pgTable('user_configs', {
 });
 
 // Repositories table
-export const repositories = pgTable('repositories', {
-	id: uuid('id').primaryKey().defaultRandom(),
-	userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+export const repositories = sqliteTable('repositories', {
+	id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+	userId: text('user_id').notNull(),
 	githubId: integer('github_id').notNull(),
 	name: text('name').notNull(),
 	fullName: text('full_name').notNull(),
 	description: text('description'),
-	private: boolean('private').default(false).notNull(),
+	private: integer('private', { mode: 'boolean' }).default(false).notNull(),
 	htmlUrl: text('html_url').notNull(),
 	cloneUrl: text('clone_url'),
-	lastCommitDate: timestamp('last_commit_date', { withTimezone: true }),
-	lastPushDate: timestamp('last_push_date', { withTimezone: true }),
-	isFork: boolean('is_fork').default(false).notNull(),
-	isArchived: boolean('is_archived').default(false).notNull(),
+	lastCommitDate: integer('last_commit_date', { mode: 'timestamp' }),
+	lastPushDate: integer('last_push_date', { mode: 'timestamp' }),
+	isFork: integer('is_fork', { mode: 'boolean' }).default(false).notNull(),
+	isArchived: integer('is_archived', { mode: 'boolean' }).default(false).notNull(),
 	defaultBranch: text('default_branch').default('main').notNull(),
 	language: text('language'),
 	starsCount: integer('stars_count').default(0).notNull(),
 	forksCount: integer('forks_count').default(0).notNull(),
 	openIssuesCount: integer('open_issues_count').default(0).notNull(),
 	sizeKb: integer('size_kb').default(0).notNull(),
-	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-	lastScannedAt: timestamp('last_scanned_at', { withTimezone: true }).defaultNow().notNull(),
+	respectsCount: integer('respects_count').default(0).notNull(),
+	upForAdoption: integer('up_for_adoption', { mode: 'boolean' }).default(false).notNull(),
+	createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+	updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+	lastScannedAt: integer('last_scanned_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
 }, (table) => {
 	return {
 		userGithubUnique: uniqueIndex('repositories_user_id_github_id_unique').on(table.userId, table.githubId),
@@ -67,18 +114,18 @@ export const repositories = pgTable('repositories', {
 });
 
 // Scan history table
-export const scanHistory = pgTable('scan_history', {
-	id: uuid('id').primaryKey().defaultRandom(),
-	userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-	scanStartedAt: timestamp('scan_started_at', { withTimezone: true }).defaultNow().notNull(),
-	scanCompletedAt: timestamp('scan_completed_at', { withTimezone: true }),
+export const scanHistory = sqliteTable('scan_history', {
+	id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+	userId: text('user_id').notNull(),
+	scanStartedAt: integer('scan_started_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+	scanCompletedAt: integer('scan_completed_at', { mode: 'timestamp' }),
 	reposScanned: integer('repos_scanned').default(0).notNull(),
 	reposAdded: integer('repos_added').default(0).notNull(),
 	reposUpdated: integer('repos_updated').default(0).notNull(),
 	errorsCount: integer('errors_count').default(0).notNull(),
-	errorDetails: jsonb('error_details'),
-	status: scanStatusEnum('status').default('running').notNull(),
-	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+	errorDetails: text('error_details', { mode: 'json' }),
+	status: text('status').default('running').notNull(),
+	createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
 }, (table) => {
 	return {
 		userIdIdx: index('idx_scan_history_user_id').on(table.userId),

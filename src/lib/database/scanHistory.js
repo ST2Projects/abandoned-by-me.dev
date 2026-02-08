@@ -5,16 +5,16 @@ import { debugLog, errorLog } from '../utils/env.js';
 /**
  * @typedef {Object} ScanHistory
  * @property {string} id
- * @property {string} user_id
- * @property {string} scan_started_at
- * @property {string|null} scan_completed_at
- * @property {number} repos_scanned
- * @property {number} repos_added
- * @property {number} repos_updated
- * @property {number} errors_count
- * @property {any|null} error_details
+ * @property {string} userId
+ * @property {Date} scanStartedAt
+ * @property {Date|null} scanCompletedAt
+ * @property {number} reposScanned
+ * @property {number} reposAdded
+ * @property {number} reposUpdated
+ * @property {number} errorsCount
+ * @property {any|null} errorDetails
  * @property {'running'|'completed'|'failed'} status
- * @property {string} created_at
+ * @property {Date} createdAt
  */
 
 /**
@@ -32,7 +32,7 @@ export async function startScan(userId) {
 				status: 'running'
 			})
 			.returning();
-		
+
 		debugLog(`Started scan ${scan.id} for user ${userId}`);
 		return scan;
 	} catch (error) {
@@ -54,7 +54,7 @@ export async function updateScan(scanId, updates) {
 			.set(updates)
 			.where(eq(scanHistory.id, scanId))
 			.returning();
-		
+
 		return result;
 	} catch (error) {
 		errorLog('Error updating scan', error);
@@ -84,7 +84,7 @@ export async function completeScan(scanId, { reposScanned, reposAdded, reposUpda
 			})
 			.where(eq(scanHistory.id, scanId))
 			.returning();
-		
+
 		debugLog(`Completed scan ${scanId}`, { reposScanned, reposAdded, reposUpdated });
 		return result;
 	} catch (error) {
@@ -119,7 +119,7 @@ export async function failScan(scanId, error, partialResults = {}) {
 			})
 			.where(eq(scanHistory.id, scanId))
 			.returning();
-		
+
 		errorLog(`Failed scan ${scanId}`, error);
 		return result;
 	} catch (updateError) {

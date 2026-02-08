@@ -5,37 +5,35 @@ This guide covers deploying Abandoned by Me using Docker and Dokploy.
 ## Prerequisites
 
 - Docker and Docker Compose installed
-- Domain name configured
+- Domain name configured (for production)
 - GitHub OAuth App created
-- PostgreSQL database (provided by docker-compose)
 
 ## Quick Start
 
 ### 1. Clone and Configure
 
 ```bash
-# Clone the repository
 git clone https://github.com/yourusername/abandoned-by-me.dev.git
 cd abandoned-by-me.dev
-
-# Copy environment example
 cp .env.example .env
-
-# Edit .env with your values
 nano .env
 ```
 
 ### 2. Required Environment Variables
 
 ```bash
-# Database (for external PostgreSQL, otherwise docker-compose handles it)
-DATABASE_URL=postgresql://postgres:yourpassword@postgres:5432/abandoned_by_me
+# Database (SQLite, path inside the container)
+DATABASE_URL=/app/data/app.db
 
-# No GitHub OAuth configuration needed - users provide their own personal access tokens
+# GitHub OAuth App
+GITHUB_CLIENT_ID=your_client_id
+GITHUB_CLIENT_SECRET=your_client_secret
 
-# Security (generate secure random strings)
-JWT_SECRET=$(openssl rand -hex 32)
-COOKIE_SECRET=$(openssl rand -hex 32)
+# Auth secret (generate with: openssl rand -base64 32)
+BETTER_AUTH_SECRET=your-random-secret
+
+# App URL (your production domain)
+BETTER_AUTH_URL=https://yourdomain.com
 
 # Production settings
 NODE_ENV=production
@@ -45,13 +43,13 @@ DEBUG=false
 ### 3. Deploy with Docker Compose
 
 ```bash
-# Build and start all services
+# Build and start
 docker-compose up -d
 
 # Check logs
 docker-compose logs -f
 
-# Database will be initialized automatically
+# SQLite database is created automatically on first run
 ```
 
 ## Dokploy Deployment
@@ -69,17 +67,18 @@ Follow the [Dokploy installation guide](https://docs.dokploy.com/docs/core/insta
 
 ### 3. Configure Environment
 
-In Dokploy dashboard:
+In the Dokploy dashboard:
 1. Go to your application settings
 2. Add all environment variables from `.env.example`
-3. Set domain configuration
-4. Enable automatic SSL via Let's Encrypt
+3. Set `BETTER_AUTH_URL` to your production domain
+4. Set domain configuration
+5. Enable automatic SSL via Let's Encrypt
 
 ### 4. Deploy
 
 Dokploy will automatically:
 - Build Docker images
-- Start services with docker-compose
+- Start the app service with docker-compose
 - Configure Traefik for routing
 - Set up SSL certificates
 - Monitor application health
@@ -92,36 +91,39 @@ Dokploy will automatically:
 # Build the application
 docker build -t abandoned-by-me:latest .
 
-# Run with docker-compose
+# Run with docker-compose (recommended)
 docker-compose up -d
 
 # Or run individually
 docker run -d \
   --name abandoned-by-me-app \
-  -p 3000:3000 \
-  -e DATABASE_URL="postgresql://..." \
+  -p 3456:3456 \
+  -v app_data:/app/data \
+  -e BETTER_AUTH_SECRET="your-secret" \
+  -e BETTER_AUTH_URL="https://yourdomain.com" \
+  -e GITHUB_CLIENT_ID="your-id" \
+  -e GITHUB_CLIENT_SECRET="your-secret" \
   abandoned-by-me:latest
 ```
 
 ### Database Management
 
-```bash
-# Access PostgreSQL
-docker-compose exec postgres psql -U postgres -d abandoned_by_me
+SQLite database is stored at `/app/data/app.db` inside the container, persisted via the `app_data` Docker volume.
 
+```bash
 # Backup database
-docker-compose exec postgres pg_dump -U postgres abandoned_by_me > backup.sql
+docker cp abandoned-by-me-app:/app/data/app.db ./backup-$(date +%Y%m%d).db
 
 # Restore database
-docker-compose exec -T postgres psql -U postgres abandoned_by_me < backup.sql
+docker cp ./backup.db abandoned-by-me-app:/app/data/app.db
+docker restart abandoned-by-me-app
 ```
 
 ## Production Considerations
 
 ### 1. Security
 
-- Use strong passwords for database
-- Generate secure JWT and cookie secrets
+- Generate a strong `BETTER_AUTH_SECRET` (use `openssl rand -base64 32`)
 - Keep environment variables secure
 - Regular security updates
 
@@ -130,23 +132,14 @@ docker-compose exec -T postgres psql -U postgres abandoned_by_me < backup.sql
 Set up automated backups:
 ```bash
 # Add to crontab
-0 2 * * * docker-compose exec postgres pg_dump -U postgres abandoned_by_me > /backups/abandoned_$(date +\%Y\%m\%d).sql
+0 2 * * * docker cp abandoned-by-me-app:/app/data/app.db /backups/abandoned_$(date +\%Y\%m\%d).db
 ```
 
 ### 3. Monitoring
 
 - Use Dokploy's built-in monitoring
 - Set up alerts for downtime
-- Monitor disk space for database
 - Check application logs regularly
-
-### 4. Scaling
-
-For high traffic:
-- Add Redis for session caching (included in docker-compose)
-- Use PostgreSQL connection pooling
-- Consider read replicas for database
-- Use CDN for static assets
 
 ## Troubleshooting
 
@@ -156,32 +149,13 @@ For high traffic:
 docker-compose logs app
 
 # Verify environment variables
-docker-compose exec app env | grep -E "DATABASE_URL|CLIENT"
-
-# Test database connection
-docker-compose exec app node -e "
-  const pg = require('pg');
-  const client = new pg.Client(process.env.DATABASE_URL);
-  client.connect().then(() => console.log('Connected!')).catch(console.error);
-"
-```
-
-### Database issues
-```bash
-# Check PostgreSQL logs
-docker-compose logs postgres
-
-# Verify tables exist
-docker-compose exec postgres psql -U postgres -d abandoned_by_me -c "\dt"
-
-# Re-run initialization
-docker-compose exec postgres psql -U postgres -d abandoned_by_me -f /docker-entrypoint-initdb.d/init.sql
+docker-compose exec app env | grep -E "DATABASE_URL|GITHUB|BETTER_AUTH"
 ```
 
 ### Authentication not working
-- Ensure users are creating GitHub Personal Access Tokens with the correct scopes
-- Check that tokens have both `repo` and `user` permissions
-- Verify the GitHub API is accessible from your server
+- Verify your GitHub OAuth App callback URL matches `BETTER_AUTH_URL` + `/api/auth/callback/github`
+- Ensure `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` are set correctly
+- Check that `BETTER_AUTH_URL` matches your actual domain
 
 ## Updates
 
@@ -195,7 +169,4 @@ git pull
 docker-compose down
 docker-compose build --no-cache
 docker-compose up -d
-
-# Run any new migrations if needed
-docker-compose exec app npm run migrate
 ```
