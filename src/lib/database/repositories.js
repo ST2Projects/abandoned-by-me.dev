@@ -1,5 +1,5 @@
-import { db, repositories, userConfigs } from './drizzle.js';
-import { eq, and, lt, isNull, or, notInArray, desc, sql } from 'drizzle-orm';
+import { db, repositories, userConfigs, user } from './drizzle.js';
+import { eq, and, lt, isNull, or, notInArray, desc, sql, count } from 'drizzle-orm';
 import { debugLog, errorLog } from '../utils/env.js';
 
 /**
@@ -228,6 +228,53 @@ export async function cleanupRemovedRepositories(userId, currentGithubIds) {
 		return deletedCount;
 	} catch (error) {
 		errorLog('Error cleaning up removed repositories', error);
+		throw error;
+	}
+}
+
+/**
+ * Gets public directory listings for the explore page
+ * @param {{ limit?: number, offset?: number }} options
+ * @returns {Promise<{ listings: Array<{ slug: string, name: string, image: string|null, totalRepos: number, abandonedCount: number }>, total: number }>}
+ */
+export async function getPublicDirectoryListings({ limit = 50, offset = 0 } = {}) {
+	try {
+		const thresholdDate = new Date();
+		thresholdDate.setMonth(thresholdDate.getMonth() - 6);
+
+		const listings = await db
+			.select({
+				slug: userConfigs.dashboardSlug,
+				name: user.name,
+				image: user.image,
+				totalRepos: count(repositories.id),
+				abandonedCount: sql`sum(case when (${repositories.lastCommitDate} < ${thresholdDate.getTime()} or ${repositories.lastCommitDate} is null) and ${repositories.isArchived} = 0 then 1 else 0 end)`.mapWith(Number),
+			})
+			.from(userConfigs)
+			.innerJoin(user, eq(userConfigs.userId, user.id))
+			.leftJoin(repositories, and(
+				eq(repositories.userId, userConfigs.userId),
+				eq(repositories.private, false),
+				eq(repositories.isFork, false)
+			))
+			.where(eq(userConfigs.dashboardPublic, true))
+			.groupBy(userConfigs.userId)
+			.orderBy(sql`sum(case when (${repositories.lastCommitDate} < ${thresholdDate.getTime()} or ${repositories.lastCommitDate} is null) and ${repositories.isArchived} = 0 then 1 else 0 end) desc`)
+			.limit(limit)
+			.offset(offset);
+
+		// Get total count of public dashboards
+		const totalResult = await db
+			.select({ total: count() })
+			.from(userConfigs)
+			.where(eq(userConfigs.dashboardPublic, true));
+
+		const total = totalResult[0]?.total ?? 0;
+
+		debugLog(`Fetched ${listings.length} public directory listings`);
+		return { listings, total };
+	} catch (error) {
+		errorLog('Error fetching public directory listings', error);
 		throw error;
 	}
 }

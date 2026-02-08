@@ -39,6 +39,7 @@
 			<a href="/" class:active={$page.url.pathname === '/'} on:click={closeMenu}>Home</a>
 			<a href="/about" class:active={$page.url.pathname === '/about'} on:click={closeMenu}>About</a>
 			<a href="/adopt" class:active={$page.url.pathname === '/adopt'} on:click={closeMenu}>Adopt</a>
+			<a href="/explore" class:active={$page.url.pathname === '/explore'} on:click={closeMenu}>Explore</a>
 			{#if user}
 				<a href="/dashboard" class:active={$page.url.pathname.startsWith('/dashboard')} on:click={closeMenu}>Dashboard</a>
 				<a href="/dashboard/config" class:active={$page.url.pathname === '/dashboard/config'} on:click={closeMenu}>Settings</a>
