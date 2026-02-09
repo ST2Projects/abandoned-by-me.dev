@@ -57,6 +57,7 @@ npm run db:studio        # Open Drizzle Studio database browser
 - **Deployment**: Docker with Dokploy
 
 ### Directory Structure
+
 ```
 src/
 ├── lib/
@@ -103,6 +104,7 @@ src/
 The app uses SQLite with Drizzle ORM. The database file is stored at the path specified by `DATABASE_URL` (default: `./data/app.db`). better-auth manages its own tables (`user`, `session`, `account`, `verification`) automatically.
 
 Application tables:
+
 - **user_configs** - Per-user settings (abandonment threshold, public dashboard settings)
 - **repositories** - Cached GitHub repository data with commit analysis
 - **scan_history** - Track repository scanning operations
@@ -110,6 +112,7 @@ Application tables:
 ### Authentication
 
 GitHub OAuth via better-auth:
+
 1. User clicks "Sign in with GitHub"
 2. better-auth handles the full OAuth flow (redirects, callbacks, session creation)
 3. Sessions stored in SQLite, managed automatically by better-auth
@@ -120,6 +123,7 @@ Required OAuth scopes: `read:user`, `public_repo`
 ### Core Features
 
 #### Repository Analysis
+
 - Fetches all user repositories from GitHub API
 - Analyzes last commit dates on default branches
 - Configurable abandonment threshold (default: 1 month)
@@ -127,6 +131,7 @@ Required OAuth scopes: `read:user`, `public_repo`
 - Caches repository data to reduce API calls
 
 #### Public Dashboards
+
 - Shareable URLs with unique slugs (e.g., `/public/username-repos`)
 - Only shows public repositories on public dashboards
 - Configurable privacy settings per user
@@ -148,6 +153,7 @@ NODE_ENV=development
 ## Deployment (Docker / Dokploy)
 
 ### Docker Compose (Production)
+
 ```bash
 docker-compose up -d
 ```
@@ -155,6 +161,7 @@ docker-compose up -d
 The docker-compose.yml runs only the app service. SQLite data is persisted via a named Docker volume (`app_data`).
 
 ### Docker Compose (Development)
+
 ```bash
 docker-compose -f docker-compose.dev.yml up
 ```
@@ -162,6 +169,7 @@ docker-compose -f docker-compose.dev.yml up
 Mounts the source directory with hot reload on port 5173.
 
 ### Dokploy
+
 - Set environment variables in Dokploy dashboard
 - Domains and SSL managed by Dokploy's Traefik integration
 

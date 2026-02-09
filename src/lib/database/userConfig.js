@@ -1,6 +1,6 @@
-import { db, userConfigs } from './drizzle.js';
-import { eq } from 'drizzle-orm';
-import { debugLog, errorLog } from '../utils/env.js';
+import { db, userConfigs } from "./drizzle.js";
+import { eq } from "drizzle-orm";
+import { debugLog, errorLog } from "../utils/env.js";
 
 /**
  * @typedef {Object} UserConfig
@@ -21,22 +21,22 @@ import { debugLog, errorLog } from '../utils/env.js';
  * @returns {Promise<UserConfig>} User configuration
  */
 export async function getUserConfig(userId) {
-	try {
-		const result = await db
-			.select()
-			.from(userConfigs)
-			.where(eq(userConfigs.userId, userId))
-			.limit(1);
+  try {
+    const result = await db
+      .select()
+      .from(userConfigs)
+      .where(eq(userConfigs.userId, userId))
+      .limit(1);
 
-		if (result.length === 0) {
-			return await createDefaultUserConfig(userId);
-		}
+    if (result.length === 0) {
+      return await createDefaultUserConfig(userId);
+    }
 
-		return result[0];
-	} catch (error) {
-		errorLog('Error fetching user config', error);
-		throw error;
-	}
+    return result[0];
+  } catch (error) {
+    errorLog("Error fetching user config", error);
+    throw error;
+  }
 }
 
 /**
@@ -45,25 +45,25 @@ export async function getUserConfig(userId) {
  * @returns {Promise<UserConfig>} Created configuration
  */
 async function createDefaultUserConfig(userId) {
-	try {
-		const result = await db
-			.insert(userConfigs)
-			.values({
-				userId,
-				abandonmentThresholdMonths: 1,
-				dashboardPublic: false,
-				dashboardSlug: null,
-				scanPrivateRepos: false,
-				autoRefresh: false
-			})
-			.returning();
+  try {
+    const result = await db
+      .insert(userConfigs)
+      .values({
+        userId,
+        abandonmentThresholdMonths: 1,
+        dashboardPublic: false,
+        dashboardSlug: null,
+        scanPrivateRepos: false,
+        autoRefresh: false,
+      })
+      .returning();
 
-		debugLog(`Created default config for user ${userId}`);
-		return result[0];
-	} catch (error) {
-		errorLog('Error creating default user config', error);
-		throw error;
-	}
+    debugLog(`Created default config for user ${userId}`);
+    return result[0];
+  } catch (error) {
+    errorLog("Error creating default user config", error);
+    throw error;
+  }
 }
 
 /**
@@ -73,22 +73,22 @@ async function createDefaultUserConfig(userId) {
  * @returns {Promise<UserConfig>} Updated configuration
  */
 export async function updateUserConfig(userId, updates) {
-	try {
-		const result = await db
-			.update(userConfigs)
-			.set({
-				...updates,
-				updatedAt: new Date()
-			})
-			.where(eq(userConfigs.userId, userId))
-			.returning();
+  try {
+    const result = await db
+      .update(userConfigs)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(eq(userConfigs.userId, userId))
+      .returning();
 
-		debugLog(`Updated config for user ${userId}`, updates);
-		return result[0];
-	} catch (error) {
-		errorLog('Error updating user config', error);
-		throw error;
-	}
+    debugLog(`Updated config for user ${userId}`, updates);
+    return result[0];
+  } catch (error) {
+    errorLog("Error updating user config", error);
+    throw error;
+  }
 }
 
 /**
@@ -97,24 +97,26 @@ export async function updateUserConfig(userId, updates) {
  * @returns {Promise<string>} Unique dashboard slug
  */
 export async function generateDashboardSlug(username) {
-	const baseSlug = `${username}-repos`.toLowerCase().replace(/[^a-z0-9-]/g, '-');
-	let slug = baseSlug;
-	let counter = 1;
+  const baseSlug = `${username}-repos`
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, "-");
+  let slug = baseSlug;
+  let counter = 1;
 
-	while (true) {
-		const result = await db
-			.select({ id: userConfigs.id })
-			.from(userConfigs)
-			.where(eq(userConfigs.dashboardSlug, slug))
-			.limit(1);
+  while (true) {
+    const result = await db
+      .select({ id: userConfigs.id })
+      .from(userConfigs)
+      .where(eq(userConfigs.dashboardSlug, slug))
+      .limit(1);
 
-		if (result.length === 0) {
-			return slug;
-		}
+    if (result.length === 0) {
+      return slug;
+    }
 
-		slug = `${baseSlug}-${counter}`;
-		counter++;
-	}
+    slug = `${baseSlug}-${counter}`;
+    counter++;
+  }
 }
 
 /**
@@ -124,25 +126,25 @@ export async function generateDashboardSlug(username) {
  * @returns {Promise<UserConfig>} Updated configuration with dashboard slug
  */
 export async function enablePublicDashboard(userId, username) {
-	try {
-		const slug = await generateDashboardSlug(username);
+  try {
+    const slug = await generateDashboardSlug(username);
 
-		const result = await db
-			.update(userConfigs)
-			.set({
-				dashboardPublic: true,
-				dashboardSlug: slug,
-				updatedAt: new Date()
-			})
-			.where(eq(userConfigs.userId, userId))
-			.returning();
+    const result = await db
+      .update(userConfigs)
+      .set({
+        dashboardPublic: true,
+        dashboardSlug: slug,
+        updatedAt: new Date(),
+      })
+      .where(eq(userConfigs.userId, userId))
+      .returning();
 
-		debugLog(`Enabled public dashboard for user ${userId} with slug ${slug}`);
-		return result[0];
-	} catch (error) {
-		errorLog('Error enabling public dashboard', error);
-		throw error;
-	}
+    debugLog(`Enabled public dashboard for user ${userId} with slug ${slug}`);
+    return result[0];
+  } catch (error) {
+    errorLog("Error enabling public dashboard", error);
+    throw error;
+  }
 }
 
 /**
@@ -151,21 +153,21 @@ export async function enablePublicDashboard(userId, username) {
  * @returns {Promise<UserConfig>} Updated configuration
  */
 export async function disablePublicDashboard(userId) {
-	try {
-		const result = await db
-			.update(userConfigs)
-			.set({
-				dashboardPublic: false,
-				dashboardSlug: null,
-				updatedAt: new Date()
-			})
-			.where(eq(userConfigs.userId, userId))
-			.returning();
+  try {
+    const result = await db
+      .update(userConfigs)
+      .set({
+        dashboardPublic: false,
+        dashboardSlug: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(userConfigs.userId, userId))
+      .returning();
 
-		debugLog(`Disabled public dashboard for user ${userId}`);
-		return result[0];
-	} catch (error) {
-		errorLog('Error disabling public dashboard', error);
-		throw error;
-	}
+    debugLog(`Disabled public dashboard for user ${userId}`);
+    return result[0];
+  } catch (error) {
+    errorLog("Error disabling public dashboard", error);
+    throw error;
+  }
 }

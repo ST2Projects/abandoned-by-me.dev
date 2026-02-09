@@ -5,10 +5,12 @@ Track your abandoned GitHub repositories. Sign in with GitHub, scan your repos, 
 ## Quick Start
 
 1. **Create a GitHub OAuth App** at [github.com/settings/developers](https://github.com/settings/developers)
+
    - Set the homepage URL to `http://localhost:5173`
    - Set the callback URL to `http://localhost:5173/api/auth/callback/github`
 
 2. **Set up the project**
+
    ```bash
    git clone <repo-url> && cd abandoned-by-me.dev
    cp .env.example .env
@@ -43,14 +45,14 @@ SQLite data is persisted via a Docker volume. Set environment variables in your 
 
 ## Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `DATABASE_URL` | SQLite file path | `./data/app.db` |
-| `GITHUB_CLIENT_ID` | GitHub OAuth App client ID | — |
-| `GITHUB_CLIENT_SECRET` | GitHub OAuth App client secret | — |
-| `BETTER_AUTH_SECRET` | Secret for auth encryption | — |
-| `BETTER_AUTH_URL` | App URL for auth callbacks | `http://localhost:5173` |
-| `DEBUG` | Enable debug logging | `false` |
+| Variable               | Description                    | Default                 |
+| ---------------------- | ------------------------------ | ----------------------- |
+| `DATABASE_URL`         | SQLite file path               | `./data/app.db`         |
+| `GITHUB_CLIENT_ID`     | GitHub OAuth App client ID     | —                       |
+| `GITHUB_CLIENT_SECRET` | GitHub OAuth App client secret | —                       |
+| `BETTER_AUTH_SECRET`   | Secret for auth encryption     | —                       |
+| `BETTER_AUTH_URL`      | App URL for auth callbacks     | `http://localhost:5173` |
+| `DEBUG`                | Enable debug logging           | `false`                 |
 
 ## Development
 

@@ -1,17 +1,17 @@
-import Database from 'better-sqlite3';
-import { drizzle } from 'drizzle-orm/better-sqlite3';
-import * as schema from './schema.js';
+import Database from "better-sqlite3";
+import { drizzle } from "drizzle-orm/better-sqlite3";
+import * as schema from "./schema.js";
 
 /**
  * Creates an in-memory SQLite database for testing
  * @returns {{ db: import('drizzle-orm/better-sqlite3').BetterSQLite3Database, sqlite: import('better-sqlite3').Database }}
  */
 export function createTestDb() {
-	const sqlite = new Database(':memory:');
-	sqlite.pragma('foreign_keys = ON');
+  const sqlite = new Database(":memory:");
+  sqlite.pragma("foreign_keys = ON");
 
-	// Create better-auth managed tables
-	const betterAuthTablesSql = `
+  // Create better-auth managed tables
+  const betterAuthTablesSql = `
 		CREATE TABLE IF NOT EXISTS "user" (
 			"id" TEXT PRIMARY KEY NOT NULL,
 			"name" TEXT NOT NULL,
@@ -58,10 +58,10 @@ export function createTestDb() {
 			"updatedAt" INTEGER NOT NULL
 		);
 	`;
-	sqlite.exec(betterAuthTablesSql);
+  sqlite.exec(betterAuthTablesSql);
 
-	// Create application tables from schema
-	const appTablesSql = `
+  // Create application tables from schema
+  const appTablesSql = `
 		CREATE TABLE IF NOT EXISTS "user_configs" (
 			"id" TEXT PRIMARY KEY,
 			"user_id" TEXT NOT NULL,
@@ -123,11 +123,11 @@ export function createTestDb() {
 		CREATE INDEX IF NOT EXISTS "idx_scan_history_user_id" ON "scan_history" ("user_id");
 		CREATE INDEX IF NOT EXISTS "idx_scan_history_created_at" ON "scan_history" ("created_at");
 	`;
-	sqlite.exec(appTablesSql);
+  sqlite.exec(appTablesSql);
 
-	const db = drizzle(sqlite, { schema });
+  const db = drizzle(sqlite, { schema });
 
-	return { db, sqlite };
+  return { db, sqlite };
 }
 
 /**
@@ -135,12 +135,14 @@ export function createTestDb() {
  * @param {import('better-sqlite3').Database} sqlite
  * @param {{ id: string, name?: string, email?: string }} user
  */
-export function insertTestUser(sqlite, { id, name = 'testuser', email }) {
-	email = email || `${id}@example.com`;
-	const now = Date.now();
-	sqlite.prepare(
-		`INSERT INTO "user" (id, name, email, "createdAt", "updatedAt") VALUES (?, ?, ?, ?, ?)`
-	).run(id, name, email, now, now);
+export function insertTestUser(sqlite, { id, name = "testuser", email }) {
+  email = email || `${id}@example.com`;
+  const now = Date.now();
+  sqlite
+    .prepare(
+      `INSERT INTO "user" (id, name, email, "createdAt", "updatedAt") VALUES (?, ?, ?, ?, ?)`,
+    )
+    .run(id, name, email, now, now);
 }
 
 /**
@@ -148,10 +150,15 @@ export function insertTestUser(sqlite, { id, name = 'testuser', email }) {
  * @param {import('better-sqlite3').Database} sqlite
  * @param {{ userId: string, accessToken?: string }} account
  */
-export function insertTestAccount(sqlite, { userId, accessToken = 'ghp_test_token_123' }) {
-	const now = Date.now();
-	sqlite.prepare(
-		`INSERT INTO "account" (id, "accountId", "providerId", "userId", "accessToken", "createdAt", "updatedAt")
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`
-	).run(crypto.randomUUID(), userId, 'github', userId, accessToken, now, now);
+export function insertTestAccount(
+  sqlite,
+  { userId, accessToken = "ghp_test_token_123" },
+) {
+  const now = Date.now();
+  sqlite
+    .prepare(
+      `INSERT INTO "account" (id, "accountId", "providerId", "userId", "accessToken", "createdAt", "updatedAt")
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(crypto.randomUUID(), userId, "github", userId, accessToken, now, now);
 }

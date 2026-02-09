@@ -1,4 +1,5 @@
-import { Octokit } from 'octokit';
+import { Octokit } from "octokit";
+import { appLog } from "$lib/utils/env.js";
 
 /**
  * Creates a new GitHub client with the provided access token
@@ -6,9 +7,9 @@ import { Octokit } from 'octokit';
  * @returns {Octokit} GitHub client instance
  */
 export function createGitHubClient(accessToken) {
-	return new Octokit({
-		auth: accessToken
-	});
+  return new Octokit({
+    auth: accessToken,
+  });
 }
 
 /**
@@ -17,13 +18,13 @@ export function createGitHubClient(accessToken) {
  * @returns {Promise<any>} User information
  */
 export async function getUserInfo(client) {
-	const response = await client.request('GET /user', {
-		headers: {
-			'X-GitHub-Api-Version': '2022-11-28'
-		}
-	});
-	
-	return response.data;
+  const response = await client.request("GET /user", {
+    headers: {
+      "X-GitHub-Api-Version": "2022-11-28",
+    },
+  });
+
+  return response.data;
 }
 
 /**
@@ -33,14 +34,14 @@ export async function getUserInfo(client) {
  * @returns {Promise<any[]>} User repositories
  */
 export async function getUserRepositories(client, username) {
-	const response = await client.request('GET /users/{username}/repos', {
-		username,
-		headers: {
-			'X-GitHub-Api-Version': '2022-11-28'
-		}
-	});
-	
-	return response.data;
+  const response = await client.request("GET /users/{username}/repos", {
+    username,
+    headers: {
+      "X-GitHub-Api-Version": "2022-11-28",
+    },
+  });
+
+  return response.data;
 }
 
 /**
@@ -49,26 +50,32 @@ export async function getUserRepositories(client, username) {
  * @returns {Promise<{user: any, scopes: string[]}>} User info and scopes
  */
 export async function testConnection(client) {
-	try {
-		const userResponse = await client.request('GET /user', {
-			headers: {
-				'X-GitHub-Api-Version': '2022-11-28'
-			}
-		});
+  try {
+    const userResponse = await client.request("GET /user", {
+      headers: {
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+    });
 
-		// Get rate limit info to check API access
-		const rateLimitResponse = await client.request('GET /rate_limit', {
-			headers: {
-				'X-GitHub-Api-Version': '2022-11-28'
-			}
-		});
+    // Get rate limit info to check API access
+    const rateLimitResponse = await client.request("GET /rate_limit", {
+      headers: {
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+    });
 
-		return {
-			user: userResponse.data,
-			scopes: rateLimitResponse.headers['x-oauth-scopes']?.split(', ') || [],
-			rateLimit: rateLimitResponse.data
-		};
-	} catch (error) {
-		throw new Error(`GitHub API connection failed: ${error.message}`);
-	}
+    const remaining = rateLimitResponse.data?.rate?.remaining;
+    const limit = rateLimitResponse.data?.rate?.limit;
+    if (remaining != null && remaining < 100) {
+      appLog("GITHUB", "Rate limit low: " + remaining + "/" + limit);
+    }
+
+    return {
+      user: userResponse.data,
+      scopes: rateLimitResponse.headers["x-oauth-scopes"]?.split(", ") || [],
+      rateLimit: rateLimitResponse.data,
+    };
+  } catch (error) {
+    throw new Error(`GitHub API connection failed: ${error.message}`);
+  }
 }

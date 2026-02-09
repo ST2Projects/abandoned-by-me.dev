@@ -1,12 +1,17 @@
-import { auth } from '$lib/auth/auth.js';
+import { building } from "$app/environment";
+import { auth } from "$lib/auth/auth.js";
 
 /** @type {import('./$types').LayoutServerLoad} */
 export async function load({ request }) {
-	const session = await auth.api.getSession({
-		headers: request.headers,
-	});
+  if (building) {
+    return { session: null };
+  }
 
-	return {
-		session,
-	};
+  const session = await auth.api.getSession({
+    headers: request.headers,
+  });
+
+  return {
+    session,
+  };
 }
