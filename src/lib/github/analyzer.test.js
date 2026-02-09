@@ -197,11 +197,9 @@ describe("analyzer", () => {
 
     it("should continue processing when individual repo analysis fails", async () => {
       const mockClient = {
-        request: vi
-          .fn()
-          .mockResolvedValueOnce({
-            data: [{ commit: { committer: { date: "2025-01-01T00:00:00Z" } } }],
-          }),
+        request: vi.fn().mockResolvedValueOnce({
+          data: [{ commit: { committer: { date: "2025-01-01T00:00:00Z" } } }],
+        }),
       };
 
       // First repo has no owner property, which will cause a TypeError
