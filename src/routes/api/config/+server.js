@@ -1,7 +1,7 @@
 import { error, json } from '@sveltejs/kit';
 import { auth } from '$lib/auth/auth.js';
 import { getUserConfig, updateUserConfig, enablePublicDashboard, disablePublicDashboard } from '$lib/database/userConfig.js';
-import { errorLog } from '$lib/utils/env.js';
+import { errorLog, appLog } from '$lib/utils/env.js';
 import { configLimiter } from '$lib/utils/rateLimit.js';
 
 /**
@@ -42,6 +42,7 @@ export async function POST({ request }) {
 		// Rate limit config updates per user
 		const rateCheck = configLimiter.check(session.user.id);
 		if (!rateCheck.allowed) {
+			appLog('RATE', 'Rate limited: /api/config');
 			return json(
 				{ error: 'Too many requests. Please try again later.' },
 				{ status: 429, headers: { 'Retry-After': String(rateCheck.retryAfter) } }
@@ -65,6 +66,7 @@ export async function POST({ request }) {
 
 		// Handle public dashboard toggle first (it manages its own fields)
 		if (updates.dashboardPublic !== undefined) {
+			appLog('CONFIG', 'Public dashboard ' + (updates.dashboardPublic ? 'enabled' : 'disabled') + ' for user ' + userId);
 			if (updates.dashboardPublic) {
 				await enablePublicDashboard(userId, username);
 			} else {

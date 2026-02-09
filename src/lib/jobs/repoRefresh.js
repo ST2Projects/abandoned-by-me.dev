@@ -4,7 +4,7 @@ import { getUserConfig } from '../database/userConfig.js';
 import { startScan, completeScan, failScan, getLatestScan } from '../database/scanHistory.js';
 import { upsertRepositories, cleanupRemovedRepositories } from '../database/repositories.js';
 import { performRepositoryScan } from '../github/analyzer.js';
-import { debugLog, errorLog } from '../utils/env.js';
+import { debugLog, errorLog, appLog } from '../utils/env.js';
 
 /** @type {number} Refresh interval in milliseconds (default 24 hours) */
 const REFRESH_INTERVAL_MS =
@@ -73,6 +73,8 @@ export function stopRepoRefreshJob() {
 async function runRefreshCycle() {
 	if (!running) return;
 
+	const cycleStart = Date.now();
+
 	try {
 		// Query all users with a linked GitHub account from better-auth tables.
 		// Uses the raw sqlite instance because these tables are managed by
@@ -85,6 +87,8 @@ async function runRefreshCycle() {
 				 WHERE a."providerId" = 'github'`
 			)
 			.all();
+
+		appLog('JOB', 'Repo refresh started');
 
 		if (users.length === 0) {
 			debugLog('Repository refresh job: no users to refresh');
@@ -124,6 +128,7 @@ async function runRefreshCycle() {
 			}
 		}
 
+		appLog('JOB', 'Repo refresh completed (' + users.length + ' users, ' + (Date.now() - cycleStart) + 'ms)');
 		debugLog('Repository refresh job: cycle complete');
 	} catch (err) {
 		errorLog('Repository refresh job: cycle failed', err);
@@ -181,6 +186,7 @@ async function refreshUserRepos(user) {
 	// Reuse config from the auto-refresh check above for scanPrivateRepos preference
 	const includePrivate = config?.scanPrivateRepos || false;
 
+	appLog('JOB', 'Refreshing repos for user ' + user.id);
 	debugLog(`Repository refresh job: scanning ${user.name}`);
 
 	// Start a scan record

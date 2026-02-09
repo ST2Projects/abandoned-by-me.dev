@@ -1,4 +1,5 @@
 import { Octokit } from 'octokit';
+import { appLog } from '$lib/utils/env.js';
 
 /**
  * Creates a new GitHub client with the provided access token
@@ -62,6 +63,12 @@ export async function testConnection(client) {
 				'X-GitHub-Api-Version': '2022-11-28'
 			}
 		});
+
+		const remaining = rateLimitResponse.data?.rate?.remaining;
+		const limit = rateLimitResponse.data?.rate?.limit;
+		if (remaining != null && remaining < 100) {
+			appLog('GITHUB', 'Rate limit low: ' + remaining + '/' + limit);
+		}
 
 		return {
 			user: userResponse.data,

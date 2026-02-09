@@ -3,7 +3,7 @@ import { auth } from '$lib/auth/auth.js';
 import { db, sqlite } from '$lib/database/drizzle.js';
 import { scanHistory, repositories, userConfigs } from '$lib/database/schema.js';
 import { eq } from 'drizzle-orm';
-import { errorLog } from '$lib/utils/env.js';
+import { errorLog, appLog } from '$lib/utils/env.js';
 import { accountDeleteLimiter, getClientKey } from '$lib/utils/rateLimit.js';
 
 /**
@@ -56,6 +56,8 @@ export async function DELETE(event) {
 		});
 
 		deleteAll();
+
+		appLog('AUTH', 'Account deleted: ' + userId);
 
 		return json({ success: true, message: 'Account and all associated data deleted successfully' });
 

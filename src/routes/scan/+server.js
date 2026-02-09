@@ -7,7 +7,7 @@ import { upsertRepositories, cleanupRemovedRepositories } from '$lib/database/re
 import { startScan, completeScan, failScan, getRunningScan } from '$lib/database/scanHistory.js';
 import { performRepositoryScan } from '$lib/github/analyzer.js';
 import { getGitHubToken } from '$lib/database/accounts.js';
-import { errorLog, debugLog } from '$lib/utils/env.js';
+import { errorLog, debugLog, appLog } from '$lib/utils/env.js';
 import { scanLimiter, getClientKey } from '$lib/utils/rateLimit.js';
 
 /**
@@ -24,6 +24,7 @@ export async function POST(event) {
 		// Rate limit scan requests per user
 		const rateCheck = scanLimiter.check(session.user.id);
 		if (!rateCheck.allowed) {
+			appLog('RATE', 'Rate limited: /scan ' + session.user.id);
 			return json(
 				{ error: 'Too many scan requests. Please try again later.' },
 				{ status: 429, headers: { 'Retry-After': String(rateCheck.retryAfter) } }
@@ -55,6 +56,7 @@ export async function POST(event) {
 
 		// Start scan record (only after token is confirmed valid)
 		const scan = await startScan(userId);
+		appLog('SCAN', 'Scan started for user ' + userId);
 		debugLog(`Started repository scan for user ${username}`);
 
 		// Perform the scan asynchronously (don't await)
@@ -154,6 +156,7 @@ async function performScanAsync(scanId, userId, username, config, accessToken) {
 			reposUpdated: upsertedRepos.length,
 		});
 
+		appLog('SCAN', 'Scan completed for user ' + userId);
 		debugLog(`Completed scan ${scanId}`, {
 			scanned: repositories.length,
 			upserted: upsertedRepos.length,

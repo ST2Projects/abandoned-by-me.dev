@@ -2,11 +2,42 @@ import { sequence } from '@sveltejs/kit/hooks';
 import { building } from '$app/environment';
 import { startRepoRefreshJob } from '$lib/jobs/repoRefresh.js';
 import { error } from '@sveltejs/kit';
+import { accessLog } from '$lib/utils/env.js';
 
 // Start background jobs once on server startup (not during build)
 if (!building) {
 	startRepoRefreshJob();
 }
+
+/**
+ * Access logging hook - logs HTTP requests with timing
+ */
+const accessLogging = async ({ event, resolve }) => {
+	if (building) {
+		return resolve(event);
+	}
+
+	const start = Date.now();
+	const response = await resolve(event);
+	const duration = Date.now() - start;
+	const pathname = event.url.pathname;
+
+	// Skip health check noise
+	if (pathname === '/health') {
+		return response;
+	}
+
+	let clientIp;
+	try {
+		clientIp = event.getClientAddress();
+	} catch {
+		// getClientAddress() may not be available in all contexts
+	}
+
+	accessLog(event.request.method, pathname, response.status, duration, clientIp);
+
+	return response;
+};
 
 /**
  * CSRF protection hook - validates Origin header on state-changing requests.
@@ -75,4 +106,4 @@ const securityHeaders = async ({ event, resolve }) => {
 	return response;
 };
 
-export const handle = sequence(csrfProtection, securityHeaders);
+export const handle = sequence(accessLogging, csrfProtection, securityHeaders);
