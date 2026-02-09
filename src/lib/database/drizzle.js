@@ -1,11 +1,11 @@
-import { drizzle } from 'drizzle-orm/better-sqlite3';
-import Database from 'better-sqlite3';
-import { mkdirSync } from 'fs';
-import { dirname } from 'path';
-import { building } from '$app/environment';
-import * as schema from './schema.js';
+import { drizzle } from "drizzle-orm/better-sqlite3";
+import Database from "better-sqlite3";
+import { mkdirSync } from "fs";
+import { dirname } from "path";
+import { building } from "$app/environment";
+import * as schema from "./schema.js";
 
-const dbPath = process.env.DATABASE_URL || './data/app.db';
+const dbPath = process.env.DATABASE_URL || "./data/app.db";
 
 // Only create real DB connection if not in build mode
 const isBuilding = building;
@@ -14,16 +14,18 @@ let db;
 let sqlite;
 
 if (!isBuilding) {
-	// Ensure directory exists
-	try { mkdirSync(dirname(dbPath), { recursive: true }); } catch {}
+  // Ensure directory exists
+  try {
+    mkdirSync(dirname(dbPath), { recursive: true });
+  } catch {}
 
-	sqlite = new Database(dbPath);
-	sqlite.pragma('journal_mode = WAL');
-	sqlite.pragma('foreign_keys = ON');
+  sqlite = new Database(dbPath);
+  sqlite.pragma("journal_mode = WAL");
+  sqlite.pragma("foreign_keys = ON");
 
-	// Create better-auth required tables if they don't exist.
-	// These tables are managed by better-auth for authentication state.
-	const createTablesSql = `
+  // Create better-auth required tables if they don't exist.
+  // These tables are managed by better-auth for authentication state.
+  const createTablesSql = `
 		CREATE TABLE IF NOT EXISTS "user" (
 			"id" TEXT PRIMARY KEY NOT NULL,
 			"name" TEXT NOT NULL,
@@ -70,11 +72,11 @@ if (!isBuilding) {
 			"updatedAt" INTEGER NOT NULL
 		);
 	`;
-	sqlite.exec(createTablesSql);
+  sqlite.exec(createTablesSql);
 
-	// Auto-create application tables if they don't exist.
-	// These are NOT managed by better-auth — they store app-specific data.
-	const createAppTablesSql = `
+  // Auto-create application tables if they don't exist.
+  // These are NOT managed by better-auth — they store app-specific data.
+  const createAppTablesSql = `
 		CREATE TABLE IF NOT EXISTS "user_configs" (
 			"id" TEXT PRIMARY KEY NOT NULL,
 			"user_id" TEXT NOT NULL,
@@ -139,27 +141,34 @@ if (!isBuilding) {
 		CREATE INDEX IF NOT EXISTS "idx_scan_history_user_id" ON "scan_history" ("user_id");
 		CREATE INDEX IF NOT EXISTS "idx_scan_history_created_at" ON "scan_history" ("created_at");
 	`;
-	sqlite.exec(createAppTablesSql);
+  sqlite.exec(createAppTablesSql);
 
-	// Add auto_refresh column for existing databases that already have the table
-	try {
-		sqlite.exec("ALTER TABLE user_configs ADD COLUMN auto_refresh INTEGER NOT NULL DEFAULT 0");
-	} catch {
-		// Column already exists — safe to ignore
-	}
+  // Add auto_refresh column for existing databases that already have the table
+  try {
+    sqlite.exec(
+      "ALTER TABLE user_configs ADD COLUMN auto_refresh INTEGER NOT NULL DEFAULT 0",
+    );
+  } catch {
+    // Column already exists — safe to ignore
+  }
 
-	db = drizzle(sqlite, { schema });
+  db = drizzle(sqlite, { schema });
 } else {
-	// During build, create a placeholder that will throw meaningful errors
-	db = new Proxy({}, {
-		get() {
-			throw new Error('Database connection not available during build process');
-		}
-	});
+  // During build, create a placeholder that will throw meaningful errors
+  db = new Proxy(
+    {},
+    {
+      get() {
+        throw new Error(
+          "Database connection not available during build process",
+        );
+      },
+    },
+  );
 }
 
 // Export database instance and raw sqlite connection
 export { db, sqlite };
 
 // Export schema for use in other modules
-export * from './schema.js';
+export * from "./schema.js";

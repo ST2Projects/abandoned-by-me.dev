@@ -1,5 +1,5 @@
-import { db } from './drizzle.js';
-import { eq } from 'drizzle-orm';
+import { db } from "./drizzle.js";
+import { eq } from "drizzle-orm";
 
 // Note: better-auth manages its own user table.
 // These functions are kept for any app-specific user queries if needed,

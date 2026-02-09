@@ -68,6 +68,7 @@ Follow the [Dokploy installation guide](https://docs.dokploy.com/docs/core/insta
 ### 3. Configure Environment
 
 In the Dokploy dashboard:
+
 1. Go to your application settings
 2. Add all environment variables from `.env.example`
 3. Set `BETTER_AUTH_URL` to your production domain
@@ -77,6 +78,7 @@ In the Dokploy dashboard:
 ### 4. Deploy
 
 Dokploy will automatically:
+
 - Build Docker images
 - Start the app service with docker-compose
 - Configure Traefik for routing
@@ -130,6 +132,7 @@ docker restart abandoned-by-me-app
 ### 2. Backups
 
 Set up automated backups:
+
 ```bash
 # Add to crontab
 0 2 * * * docker cp abandoned-by-me-app:/app/data/app.db /backups/abandoned_$(date +\%Y\%m\%d).db
@@ -144,6 +147,7 @@ Set up automated backups:
 ## Troubleshooting
 
 ### Application won't start
+
 ```bash
 # Check logs
 docker-compose logs app
@@ -153,6 +157,7 @@ docker-compose exec app env | grep -E "DATABASE_URL|GITHUB|BETTER_AUTH"
 ```
 
 ### Authentication not working
+
 - Verify your GitHub OAuth App callback URL matches `BETTER_AUTH_URL` + `/api/auth/callback/github`
 - Ensure `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` are set correctly
 - Check that `BETTER_AUTH_URL` matches your actual domain

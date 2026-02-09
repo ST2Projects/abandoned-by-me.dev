@@ -1,6 +1,6 @@
-import { db, scanHistory } from './drizzle.js';
-import { eq, desc, and } from 'drizzle-orm';
-import { debugLog, errorLog } from '../utils/env.js';
+import { db, scanHistory } from "./drizzle.js";
+import { eq, desc, and } from "drizzle-orm";
+import { debugLog, errorLog } from "../utils/env.js";
 
 /**
  * @typedef {Object} ScanHistory
@@ -23,22 +23,22 @@ import { debugLog, errorLog } from '../utils/env.js';
  * @returns {Promise<ScanHistory>} Created scan record
  */
 export async function startScan(userId) {
-	try {
-		const [scan] = await db
-			.insert(scanHistory)
-			.values({
-				userId,
-				scanStartedAt: new Date(),
-				status: 'running'
-			})
-			.returning();
+  try {
+    const [scan] = await db
+      .insert(scanHistory)
+      .values({
+        userId,
+        scanStartedAt: new Date(),
+        status: "running",
+      })
+      .returning();
 
-		debugLog(`Started scan ${scan.id} for user ${userId}`);
-		return scan;
-	} catch (error) {
-		errorLog('Error starting scan', error);
-		throw error;
-	}
+    debugLog(`Started scan ${scan.id} for user ${userId}`);
+    return scan;
+  } catch (error) {
+    errorLog("Error starting scan", error);
+    throw error;
+  }
 }
 
 /**
@@ -48,18 +48,18 @@ export async function startScan(userId) {
  * @returns {Promise<ScanHistory>} Updated scan record
  */
 export async function updateScan(scanId, updates) {
-	try {
-		const [result] = await db
-			.update(scanHistory)
-			.set(updates)
-			.where(eq(scanHistory.id, scanId))
-			.returning();
+  try {
+    const [result] = await db
+      .update(scanHistory)
+      .set(updates)
+      .where(eq(scanHistory.id, scanId))
+      .returning();
 
-		return result;
-	} catch (error) {
-		errorLog('Error updating scan', error);
-		throw error;
-	}
+    return result;
+  } catch (error) {
+    errorLog("Error updating scan", error);
+    throw error;
+  }
 }
 
 /**
@@ -71,26 +71,33 @@ export async function updateScan(scanId, updates) {
  * @param {number} results.reposUpdated - Number of repositories updated
  * @returns {Promise<ScanHistory>} Completed scan record
  */
-export async function completeScan(scanId, { reposScanned, reposAdded, reposUpdated }) {
-	try {
-		const [result] = await db
-			.update(scanHistory)
-			.set({
-				scanCompletedAt: new Date(),
-				status: 'completed',
-				reposScanned,
-				reposAdded,
-				reposUpdated
-			})
-			.where(eq(scanHistory.id, scanId))
-			.returning();
+export async function completeScan(
+  scanId,
+  { reposScanned, reposAdded, reposUpdated },
+) {
+  try {
+    const [result] = await db
+      .update(scanHistory)
+      .set({
+        scanCompletedAt: new Date(),
+        status: "completed",
+        reposScanned,
+        reposAdded,
+        reposUpdated,
+      })
+      .where(eq(scanHistory.id, scanId))
+      .returning();
 
-		debugLog(`Completed scan ${scanId}`, { reposScanned, reposAdded, reposUpdated });
-		return result;
-	} catch (error) {
-		errorLog('Error completing scan', error);
-		throw error;
-	}
+    debugLog(`Completed scan ${scanId}`, {
+      reposScanned,
+      reposAdded,
+      reposUpdated,
+    });
+    return result;
+  } catch (error) {
+    errorLog("Error completing scan", error);
+    throw error;
+  }
 }
 
 /**
@@ -101,31 +108,31 @@ export async function completeScan(scanId, { reposScanned, reposAdded, reposUpda
  * @returns {Promise<ScanHistory>} Failed scan record
  */
 export async function failScan(scanId, error, partialResults = {}) {
-	try {
-		const errorDetails = {
-			message: error.message || error.toString(),
-			stack: error.stack,
-			timestamp: new Date().toISOString()
-		};
+  try {
+    const errorDetails = {
+      message: error.message || error.toString(),
+      stack: error.stack,
+      timestamp: new Date().toISOString(),
+    };
 
-		const [result] = await db
-			.update(scanHistory)
-			.set({
-				scanCompletedAt: new Date(),
-				status: 'failed',
-				errorsCount: 1,
-				errorDetails: errorDetails,
-				...partialResults
-			})
-			.where(eq(scanHistory.id, scanId))
-			.returning();
+    const [result] = await db
+      .update(scanHistory)
+      .set({
+        scanCompletedAt: new Date(),
+        status: "failed",
+        errorsCount: 1,
+        errorDetails: errorDetails,
+        ...partialResults,
+      })
+      .where(eq(scanHistory.id, scanId))
+      .returning();
 
-		errorLog(`Failed scan ${scanId}`, error);
-		return result;
-	} catch (updateError) {
-		errorLog('Error updating failed scan', updateError);
-		throw updateError;
-	}
+    errorLog(`Failed scan ${scanId}`, error);
+    return result;
+  } catch (updateError) {
+    errorLog("Error updating failed scan", updateError);
+    throw updateError;
+  }
 }
 
 /**
@@ -135,19 +142,19 @@ export async function failScan(scanId, error, partialResults = {}) {
  * @returns {Promise<ScanHistory[]>} Scan history
  */
 export async function getUserScanHistory(userId, limit = 10) {
-	try {
-		const result = await db
-			.select()
-			.from(scanHistory)
-			.where(eq(scanHistory.userId, userId))
-			.orderBy(desc(scanHistory.createdAt))
-			.limit(limit);
+  try {
+    const result = await db
+      .select()
+      .from(scanHistory)
+      .where(eq(scanHistory.userId, userId))
+      .orderBy(desc(scanHistory.createdAt))
+      .limit(limit);
 
-		return result;
-	} catch (error) {
-		errorLog('Error fetching scan history', error);
-		throw error;
-	}
+    return result;
+  } catch (error) {
+    errorLog("Error fetching scan history", error);
+    throw error;
+  }
 }
 
 /**
@@ -156,19 +163,19 @@ export async function getUserScanHistory(userId, limit = 10) {
  * @returns {Promise<ScanHistory|null>} Latest scan or null
  */
 export async function getLatestScan(userId) {
-	try {
-		const result = await db
-			.select()
-			.from(scanHistory)
-			.where(eq(scanHistory.userId, userId))
-			.orderBy(desc(scanHistory.createdAt))
-			.limit(1);
+  try {
+    const result = await db
+      .select()
+      .from(scanHistory)
+      .where(eq(scanHistory.userId, userId))
+      .orderBy(desc(scanHistory.createdAt))
+      .limit(1);
 
-		return result[0] || null;
-	} catch (error) {
-		errorLog('Error fetching latest scan', error);
-		throw error;
-	}
+    return result[0] || null;
+  } catch (error) {
+    errorLog("Error fetching latest scan", error);
+    throw error;
+  }
 }
 
 /**
@@ -177,21 +184,18 @@ export async function getLatestScan(userId) {
  * @returns {Promise<ScanHistory|null>} Running scan or null
  */
 export async function getRunningScan(userId) {
-	try {
-		const result = await db
-			.select()
-			.from(scanHistory)
-			.where(
-				and(
-					eq(scanHistory.userId, userId),
-					eq(scanHistory.status, 'running')
-				)
-			)
-			.limit(1);
+  try {
+    const result = await db
+      .select()
+      .from(scanHistory)
+      .where(
+        and(eq(scanHistory.userId, userId), eq(scanHistory.status, "running")),
+      )
+      .limit(1);
 
-		return result[0] || null;
-	} catch (error) {
-		errorLog('Error checking for running scan', error);
-		throw error;
-	}
+    return result[0] || null;
+  } catch (error) {
+    errorLog("Error checking for running scan", error);
+    throw error;
+  }
 }

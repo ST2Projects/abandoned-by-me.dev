@@ -1,35 +1,34 @@
-import { error } from '@sveltejs/kit';
+import { error } from "@sveltejs/kit";
 
 export async function load({ params, fetch }) {
-	const { slug } = params;
+  const { slug } = params;
 
-	try {
-		const response = await fetch(`/api/public/${slug}`);
-		
-		if (!response.ok) {
-			if (response.status === 404) {
-				throw error(404, 'Dashboard not found or not public');
-			}
-			throw error(500, 'Failed to load dashboard');
-		}
+  try {
+    const response = await fetch(`/api/public/${slug}`);
 
-		const data = await response.json();
-		
-		return {
-			slug,
-			repositories: data.repositories,
-			config: data.config,
-			user: data.user,
-			meta: {
-				title: `${slug}'s Abandoned Repositories`,
-				description: `Public dashboard showing ${slug}'s abandoned GitHub repositories`
-			}
-		};
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw error(404, "Dashboard not found or not public");
+      }
+      throw error(500, "Failed to load dashboard");
+    }
 
-	} catch (err) {
-		if (err.status) {
-			throw err; // Re-throw SvelteKit errors
-		}
-		throw error(500, 'Failed to load dashboard');
-	}
+    const data = await response.json();
+
+    return {
+      slug,
+      repositories: data.repositories,
+      config: data.config,
+      user: data.user,
+      meta: {
+        title: `${slug}'s Abandoned Repositories`,
+        description: `Public dashboard showing ${slug}'s abandoned GitHub repositories`,
+      },
+    };
+  } catch (err) {
+    if (err.status) {
+      throw err; // Re-throw SvelteKit errors
+    }
+    throw error(500, "Failed to load dashboard");
+  }
 }

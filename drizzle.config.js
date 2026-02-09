@@ -1,12 +1,12 @@
-import { defineConfig } from 'drizzle-kit';
+import { defineConfig } from "drizzle-kit";
 
 export default defineConfig({
-	schema: './src/lib/database/schema.js',
-	out: './drizzle',
-	dialect: 'sqlite',
-	dbCredentials: {
-		url: process.env.DATABASE_URL || './data/app.db',
-	},
-	verbose: true,
-	strict: true,
+  schema: "./src/lib/database/schema.js",
+  out: "./drizzle",
+  dialect: "sqlite",
+  dbCredentials: {
+    url: process.env.DATABASE_URL || "./data/app.db",
+  },
+  verbose: true,
+  strict: true,
 });

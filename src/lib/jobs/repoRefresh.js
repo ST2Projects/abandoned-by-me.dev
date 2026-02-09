@@ -1,14 +1,22 @@
-import { sqlite } from '../database/drizzle.js';
-import { getGitHubToken } from '../database/accounts.js';
-import { getUserConfig } from '../database/userConfig.js';
-import { startScan, completeScan, failScan, getLatestScan } from '../database/scanHistory.js';
-import { upsertRepositories, cleanupRemovedRepositories } from '../database/repositories.js';
-import { performRepositoryScan } from '../github/analyzer.js';
-import { debugLog, errorLog, appLog } from '../utils/env.js';
+import { sqlite } from "../database/drizzle.js";
+import { getGitHubToken } from "../database/accounts.js";
+import { getUserConfig } from "../database/userConfig.js";
+import {
+  startScan,
+  completeScan,
+  failScan,
+  getLatestScan,
+} from "../database/scanHistory.js";
+import {
+  upsertRepositories,
+  cleanupRemovedRepositories,
+} from "../database/repositories.js";
+import { performRepositoryScan } from "../github/analyzer.js";
+import { debugLog, errorLog, appLog } from "../utils/env.js";
 
 /** @type {number} Refresh interval in milliseconds (default 24 hours) */
 const REFRESH_INTERVAL_MS =
-	(parseInt(process.env.REFRESH_INTERVAL_HOURS, 10) || 24) * 60 * 60 * 1000;
+  (parseInt(process.env.REFRESH_INTERVAL_HOURS, 10) || 24) * 60 * 60 * 1000;
 
 /** @type {number} Minimum delay between processing individual users (10 seconds) */
 const MIN_DELAY_BETWEEN_USERS_MS = 10 * 1000;
@@ -38,29 +46,29 @@ let timeoutId = null;
  * Calling this multiple times is safe -- subsequent calls are no-ops.
  */
 export function startRepoRefreshJob() {
-	if (running) return;
-	running = true;
+  if (running) return;
+  running = true;
 
-	debugLog('Repository refresh job: started', {
-		refreshIntervalMs: REFRESH_INTERVAL_MS,
-		staleThresholdMs: STALE_THRESHOLD_MS,
-		minDelayBetweenUsersMs: MIN_DELAY_BETWEEN_USERS_MS
-	});
+  debugLog("Repository refresh job: started", {
+    refreshIntervalMs: REFRESH_INTERVAL_MS,
+    staleThresholdMs: STALE_THRESHOLD_MS,
+    minDelayBetweenUsersMs: MIN_DELAY_BETWEEN_USERS_MS,
+  });
 
-	// Start first cycle after 60 seconds to let the app fully initialize
-	timeoutId = setTimeout(() => runRefreshCycle(), 60 * 1000);
+  // Start first cycle after 60 seconds to let the app fully initialize
+  timeoutId = setTimeout(() => runRefreshCycle(), 60 * 1000);
 }
 
 /**
  * Stops the repository refresh background job.
  */
 export function stopRepoRefreshJob() {
-	running = false;
-	if (timeoutId) {
-		clearTimeout(timeoutId);
-		timeoutId = null;
-	}
-	debugLog('Repository refresh job: stopped');
+  running = false;
+  if (timeoutId) {
+    clearTimeout(timeoutId);
+    timeoutId = null;
+  }
+  debugLog("Repository refresh job: stopped");
 }
 
 /**
@@ -71,71 +79,78 @@ export function stopRepoRefreshJob() {
  * cycle using setTimeout to avoid overlapping runs.
  */
 async function runRefreshCycle() {
-	if (!running) return;
+  if (!running) return;
 
-	const cycleStart = Date.now();
+  const cycleStart = Date.now();
 
-	try {
-		// Query all users with a linked GitHub account from better-auth tables.
-		// Uses the raw sqlite instance because these tables are managed by
-		// better-auth, not by the Drizzle schema (same pattern as accounts.js).
-		const users = sqlite
-			.prepare(
-				`SELECT DISTINCT u.id, u.name
+  try {
+    // Query all users with a linked GitHub account from better-auth tables.
+    // Uses the raw sqlite instance because these tables are managed by
+    // better-auth, not by the Drizzle schema (same pattern as accounts.js).
+    const users = sqlite
+      .prepare(
+        `SELECT DISTINCT u.id, u.name
 				 FROM "user" u
 				 INNER JOIN "account" a ON u.id = a."userId"
-				 WHERE a."providerId" = 'github'`
-			)
-			.all();
+				 WHERE a."providerId" = 'github'`,
+      )
+      .all();
 
-		appLog('JOB', 'Repo refresh started');
+    appLog("JOB", "Repo refresh started");
 
-		if (users.length === 0) {
-			debugLog('Repository refresh job: no users to refresh');
-			scheduleNextCycle();
-			return;
-		}
+    if (users.length === 0) {
+      debugLog("Repository refresh job: no users to refresh");
+      scheduleNextCycle();
+      return;
+    }
 
-		// Calculate delay between users to spread them across the full interval.
-		// e.g., 24 hours / 100 users = ~14.4 minutes per user.
-		// Never go below MIN_DELAY_BETWEEN_USERS_MS to avoid hammering the API.
-		const delayBetweenUsers = Math.max(
-			MIN_DELAY_BETWEEN_USERS_MS,
-			Math.floor(REFRESH_INTERVAL_MS / users.length)
-		);
+    // Calculate delay between users to spread them across the full interval.
+    // e.g., 24 hours / 100 users = ~14.4 minutes per user.
+    // Never go below MIN_DELAY_BETWEEN_USERS_MS to avoid hammering the API.
+    const delayBetweenUsers = Math.max(
+      MIN_DELAY_BETWEEN_USERS_MS,
+      Math.floor(REFRESH_INTERVAL_MS / users.length),
+    );
 
-		debugLog(
-			`Repository refresh job: ${users.length} users, ` +
-				`${Math.round(delayBetweenUsers / 1000)}s between each`
-		);
+    debugLog(
+      `Repository refresh job: ${users.length} users, ` +
+        `${Math.round(delayBetweenUsers / 1000)}s between each`,
+    );
 
-		// Process users one at a time with staggered delays
-		for (let i = 0; i < users.length; i++) {
-			if (!running) break;
+    // Process users one at a time with staggered delays
+    for (let i = 0; i < users.length; i++) {
+      if (!running) break;
 
-			try {
-				await refreshUserRepos(users[i]);
-			} catch (err) {
-				errorLog(
-					`Repository refresh job: failed for ${users[i].name || users[i].id}`,
-					err
-				);
-			}
+      try {
+        await refreshUserRepos(users[i]);
+      } catch (err) {
+        errorLog(
+          `Repository refresh job: failed for ${users[i].name || users[i].id}`,
+          err,
+        );
+      }
 
-			// Wait before next user (except after the last one)
-			if (i < users.length - 1 && running) {
-				await sleep(delayBetweenUsers);
-			}
-		}
+      // Wait before next user (except after the last one)
+      if (i < users.length - 1 && running) {
+        await sleep(delayBetweenUsers);
+      }
+    }
 
-		appLog('JOB', 'Repo refresh completed (' + users.length + ' users, ' + (Date.now() - cycleStart) + 'ms)');
-		debugLog('Repository refresh job: cycle complete');
-	} catch (err) {
-		errorLog('Repository refresh job: cycle failed', err);
-	}
+    appLog(
+      "JOB",
+      "Repo refresh completed (" +
+        users.length +
+        " users, " +
+        (Date.now() - cycleStart) +
+        "ms)",
+    );
+    debugLog("Repository refresh job: cycle complete");
+  } catch (err) {
+    errorLog("Repository refresh job: cycle failed", err);
+  }
 
-	// Schedule the next cycle
-	scheduleNextCycle();
+  // Schedule the next cycle
+  scheduleNextCycle();
 }
 
 /**
@@ -144,9 +159,9 @@ async function runRefreshCycle() {
  * cycle takes longer than the interval.
  */
 function scheduleNextCycle() {
-	if (running) {
-		timeoutId = setTimeout(() => runRefreshCycle(), REFRESH_INTERVAL_MS);
-	}
+  if (running) {
+    timeoutId = setTimeout(() => runRefreshCycle(), REFRESH_INTERVAL_MS);
+  }
 }
 
 /**
@@ -156,82 +171,93 @@ function scheduleNextCycle() {
  * @param {{ id: string, name: string }} user - User record
  */
 async function refreshUserRepos(user) {
-	// Check if user has auto-refresh enabled
-	const config = await getUserConfig(user.id);
-	if (!config?.autoRefresh) {
-		debugLog(`Repository refresh job: skipping ${user.name} (auto-refresh disabled)`);
-		return;
-	}
+  // Check if user has auto-refresh enabled
+  const config = await getUserConfig(user.id);
+  if (!config?.autoRefresh) {
+    debugLog(
+      `Repository refresh job: skipping ${user.name} (auto-refresh disabled)`,
+    );
+    return;
+  }
 
-	// Check last scan time — skip if scanned recently
-	const latestScan = await getLatestScan(user.id);
-	if (latestScan && latestScan.scanStartedAt) {
-		const lastScanTime =
-			latestScan.scanStartedAt instanceof Date
-				? latestScan.scanStartedAt.getTime()
-				: new Date(latestScan.scanStartedAt).getTime();
-		if (Date.now() - lastScanTime < STALE_THRESHOLD_MS) {
-			debugLog(`Repository refresh job: skipping ${user.name} (recently scanned)`);
-			return;
-		}
-	}
+  // Check last scan time — skip if scanned recently
+  const latestScan = await getLatestScan(user.id);
+  if (latestScan && latestScan.scanStartedAt) {
+    const lastScanTime =
+      latestScan.scanStartedAt instanceof Date
+        ? latestScan.scanStartedAt.getTime()
+        : new Date(latestScan.scanStartedAt).getTime();
+    if (Date.now() - lastScanTime < STALE_THRESHOLD_MS) {
+      debugLog(
+        `Repository refresh job: skipping ${user.name} (recently scanned)`,
+      );
+      return;
+    }
+  }
 
-	// Get the GitHub access token (synchronous — uses raw sqlite)
-	const accessToken = getGitHubToken(user.id);
-	if (!accessToken) {
-		debugLog(`Repository refresh job: skipping ${user.name} (no token)`);
-		return;
-	}
+  // Get the GitHub access token (synchronous — uses raw sqlite)
+  const accessToken = getGitHubToken(user.id);
+  if (!accessToken) {
+    debugLog(`Repository refresh job: skipping ${user.name} (no token)`);
+    return;
+  }
 
-	// Reuse config from the auto-refresh check above for scanPrivateRepos preference
-	const includePrivate = config?.scanPrivateRepos || false;
+  // Reuse config from the auto-refresh check above for scanPrivateRepos preference
+  const includePrivate = config?.scanPrivateRepos || false;
 
-	appLog('JOB', 'Refreshing repos for user ' + user.id);
-	debugLog(`Repository refresh job: scanning ${user.name}`);
+  appLog("JOB", "Refreshing repos for user " + user.id);
+  debugLog(`Repository refresh job: scanning ${user.name}`);
 
-	// Start a scan record
-	const scan = await startScan(user.id);
+  // Start a scan record
+  const scan = await startScan(user.id);
 
-	try {
-		// Perform the same scan as the manual /scan endpoint:
-		// performRepositoryScan(accessToken, username, includePrivate)
-		const repositories = await performRepositoryScan(accessToken, user.name, includePrivate);
+  try {
+    // Perform the same scan as the manual /scan endpoint:
+    // performRepositoryScan(accessToken, username, includePrivate)
+    const repositories = await performRepositoryScan(
+      accessToken,
+      user.name,
+      includePrivate,
+    );
 
-		if (repositories.length === 0) {
-			await completeScan(scan.id, {
-				reposScanned: 0,
-				reposAdded: 0,
-				reposUpdated: 0
-			});
-			debugLog(`Repository refresh job: ${user.name} done — 0 repos found`);
-			return;
-		}
+    if (repositories.length === 0) {
+      await completeScan(scan.id, {
+        reposScanned: 0,
+        reposAdded: 0,
+        reposUpdated: 0,
+      });
+      debugLog(`Repository refresh job: ${user.name} done — 0 repos found`);
+      return;
+    }
 
-		// Get current GitHub IDs for cleanup
-		const currentGithubIds = repositories.map((repo) => repo.github_id);
+    // Get current GitHub IDs for cleanup
+    const currentGithubIds = repositories.map((repo) => repo.github_id);
 
-		// Upsert repositories to database
-		const upsertedRepos = await upsertRepositories(user.id, repositories);
+    // Upsert repositories to database
+    const upsertedRepos = await upsertRepositories(user.id, repositories);
 
-		// Clean up repositories that no longer exist on GitHub
-		const deletedCount = await cleanupRemovedRepositories(user.id, currentGithubIds);
+    // Clean up repositories that no longer exist on GitHub
+    const deletedCount = await cleanupRemovedRepositories(
+      user.id,
+      currentGithubIds,
+    );
 
-		// Complete the scan
-		await completeScan(scan.id, {
-			reposScanned: repositories.length,
-			reposAdded: upsertedRepos.length,
-			reposUpdated: upsertedRepos.length
-		});
+    // Complete the scan
+    await completeScan(scan.id, {
+      reposScanned: repositories.length,
+      reposAdded: upsertedRepos.length,
+      reposUpdated: upsertedRepos.length,
+    });
 
-		debugLog(`Repository refresh job: ${user.name} done`, {
-			scanned: repositories.length,
-			upserted: upsertedRepos.length,
-			deleted: deletedCount
-		});
-	} catch (err) {
-		await failScan(scan.id, err);
-		throw err;
-	}
+    debugLog(`Repository refresh job: ${user.name} done`, {
+      scanned: repositories.length,
+      upserted: upsertedRepos.length,
+      deleted: deletedCount,
+    });
+  } catch (err) {
+    await failScan(scan.id, err);
+    throw err;
+  }
 }
 
 /**
@@ -240,5 +266,5 @@ async function refreshUserRepos(user) {
  * @returns {Promise<void>}
  */
 function sleep(ms) {
-	return new Promise((resolve) => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

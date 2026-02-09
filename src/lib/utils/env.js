@@ -1,4 +1,4 @@
-import { dev } from '$app/environment';
+import { dev } from "$app/environment";
 
 /**
  * Logs debug information in development mode
@@ -6,9 +6,9 @@ import { dev } from '$app/environment';
  * @param {any} [data] - Optional data to log
  */
 export function debugLog(message, data) {
-	if (dev) {
-		console.log(`[DEBUG] ${message}`, data);
-	}
+  if (dev) {
+    console.log(`[DEBUG] ${message}`, data);
+  }
 }
 
 /**
@@ -17,7 +17,7 @@ export function debugLog(message, data) {
  * @param {Error | any} [error] - Error object or data
  */
 export function errorLog(message, error) {
-	console.error(`[ERROR] ${message}`, error);
+  console.error(`[ERROR] ${message}`, error);
 }
 
 /**
@@ -29,7 +29,9 @@ export function errorLog(message, error) {
  * @param {string} [clientIp] - Client IP address
  */
 export function accessLog(method, pathname, status, durationMs, clientIp) {
-	console.log(`[ACCESS] ${method} ${pathname} ${status} ${durationMs}ms${clientIp ? ' ' + clientIp : ''}`);
+  console.log(
+    `[ACCESS] ${method} ${pathname} ${status} ${durationMs}ms${clientIp ? " " + clientIp : ""}`,
+  );
 }
 
 /**
@@ -38,7 +40,7 @@ export function accessLog(method, pathname, status, durationMs, clientIp) {
  * @param {string} message - Event description
  */
 export function appLog(tag, message) {
-	console.log(`[${tag}] ${message}`);
+  console.log(`[${tag}] ${message}`);
 }
 
 /**
@@ -47,9 +49,11 @@ export function appLog(tag, message) {
  * @throws {Error} If any required variables are missing
  */
 export function validateEnvironment(requiredVars) {
-	const missing = requiredVars.filter(varName => !process.env[varName]);
-	
-	if (missing.length > 0) {
-		throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
-	}
+  const missing = requiredVars.filter((varName) => !process.env[varName]);
+
+  if (missing.length > 0) {
+    throw new Error(
+      `Missing required environment variables: ${missing.join(", ")}`,
+    );
+  }
 }

@@ -1,4 +1,4 @@
 export async function load({ parent }) {
-	const { session } = await parent();
-	return { session };
+  const { session } = await parent();
+  return { session };
 }
