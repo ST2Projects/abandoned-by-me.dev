@@ -30,7 +30,7 @@
     "pino-roll": "^4.0.0"
   },
   "devDependencies": {
-    "@fontsource/fira-mono": "^4.5.10",
+    "@fontsource/fira-mono": "^5.2.7",
     "@playwright/test": "^1.55.1",
     "@sveltejs/adapter-node": "^2.0.0",
     "@sveltejs/kit": "^2.20.6",
