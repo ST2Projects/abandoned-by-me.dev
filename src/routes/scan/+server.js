@@ -1,6 +1,6 @@
 import { error, json } from "@sveltejs/kit";
 import { eq, and } from "drizzle-orm";
-import { auth } from "$lib/auth/auth.js";
+import { requireSession } from "$lib/utils/session.js";
 import { db, scanHistory } from "$lib/database/drizzle.js";
 import { getUserConfig } from "$lib/database/userConfig.js";
 import {
@@ -24,10 +24,7 @@ import { scanLimiter, getClientKey } from "$lib/utils/rateLimit.js";
 export async function POST(event) {
   try {
     const { request } = event;
-    const session = await auth.api.getSession({ headers: request.headers });
-    if (!session?.user) {
-      throw error(401, "Authentication required");
-    }
+    const session = await requireSession(request.headers);
 
     // Rate limit scan requests per user
     const rateCheck = scanLimiter.check(session.user.id);
@@ -101,11 +98,7 @@ export async function GET({ url, request }) {
       throw error(400, "Scan ID required");
     }
 
-    const session = await auth.api.getSession({ headers: request.headers });
-    if (!session?.user) {
-      throw error(401, "Authentication required");
-    }
-
+    const session = await requireSession(request.headers);
     const userId = session.user.id;
 
     // Get scan status

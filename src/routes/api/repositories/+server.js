@@ -1,5 +1,5 @@
 import { error, json } from "@sveltejs/kit";
-import { auth } from "$lib/auth/auth.js";
+import { requireSession } from "$lib/utils/session.js";
 import {
   getUserRepositories,
   getAbandonedRepositories,
@@ -12,11 +12,7 @@ import { errorLog } from "$lib/utils/env.js";
  */
 export async function GET({ url, request }) {
   try {
-    // Check authentication via better-auth
-    const session = await auth.api.getSession({ headers: request.headers });
-    if (!session?.user) {
-      throw error(401, "Authentication required");
-    }
+    const session = await requireSession(request.headers);
 
     const userId = session.user.id;
 

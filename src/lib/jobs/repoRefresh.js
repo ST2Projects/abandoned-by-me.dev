@@ -1,4 +1,5 @@
-import { sqlite } from "../database/drizzle.js";
+import { db, sqlite } from "../database/drizzle.js";
+import { sql } from "drizzle-orm";
 import { getGitHubToken } from "../database/accounts.js";
 import { getUserConfig } from "../database/userConfig.js";
 import {
@@ -85,16 +86,15 @@ async function runRefreshCycle() {
 
   try {
     // Query all users with a linked GitHub account from better-auth tables.
-    // Uses the raw sqlite instance because these tables are managed by
-    // better-auth, not by the Drizzle schema (same pattern as accounts.js).
-    const users = sqlite
-      .prepare(
-        `SELECT DISTINCT u.id, u.name
-				 FROM "user" u
-				 INNER JOIN "account" a ON u.id = a."userId"
-				 WHERE a."providerId" = 'github'`,
-      )
-      .all();
+    // Uses Drizzle's sql template tag for parameterization safety, even though
+    // this query has no user input. These tables are managed by better-auth,
+    // not by our Drizzle schema.
+    const users = db.all(
+      sql`SELECT DISTINCT u.id, u.name
+          FROM "user" u
+          INNER JOIN "account" a ON u.id = a."userId"
+          WHERE a."providerId" = 'github'`,
+    );
 
     appLog("JOB", "Repo refresh started");
 

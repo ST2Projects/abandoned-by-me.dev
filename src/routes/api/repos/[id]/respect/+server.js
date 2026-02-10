@@ -43,6 +43,7 @@ export async function POST(event) {
     maxAge: 60 * 60 * 24,
     httpOnly: true,
     sameSite: "lax",
+    secure: true,
   });
 
   return json({ respectsCount: result[0].respectsCount });

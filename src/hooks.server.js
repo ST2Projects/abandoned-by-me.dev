@@ -2,10 +2,16 @@ import { sequence } from "@sveltejs/kit/hooks";
 import { building } from "$app/environment";
 import { startRepoRefreshJob } from "$lib/jobs/repoRefresh.js";
 import { error } from "@sveltejs/kit";
-import { accessLog } from "$lib/utils/env.js";
+import { accessLog, validateEnvironment } from "$lib/utils/env.js";
 
-// Start background jobs once on server startup (not during build)
+// Validate required environment variables on startup (not during build)
 if (!building) {
+  validateEnvironment([
+    "BETTER_AUTH_SECRET",
+    "BETTER_AUTH_URL",
+    "GITHUB_CLIENT_ID",
+    "GITHUB_CLIENT_SECRET",
+  ]);
   startRepoRefreshJob();
 }
 
@@ -60,20 +66,21 @@ const csrfProtection = async ({ event, resolve }) => {
 
     // Allow requests from better-auth's internal flows (they set correct origin)
     // and from same-origin. Block requests with missing or mismatched origin.
-    if (origin) {
-      let originHost;
-      try {
-        originHost = new URL(origin).host;
-      } catch {
-        throw error(403, "Forbidden");
-      }
-      if (originHost !== host) {
-        throw error(403, "Forbidden");
-      }
+    if (!origin) {
+      // Modern browsers always send Origin on non-safe requests.
+      // Reject requests without Origin to prevent CSRF attacks.
+      throw error(403, "Forbidden");
     }
-    // If no Origin header is present, the request likely comes from a non-browser
-    // client (e.g., curl, server-to-server). We allow these through since they
-    // can't carry cookies/sessions from a victim's browser (CSRF requires a browser).
+
+    let originHost;
+    try {
+      originHost = new URL(origin).host;
+    } catch {
+      throw error(403, "Forbidden");
+    }
+    if (originHost !== host) {
+      throw error(403, "Forbidden");
+    }
   }
 
   return resolve(event);
@@ -97,20 +104,8 @@ const securityHeaders = async ({ event, resolve }) => {
   // Remove server identification
   response.headers.set("X-Powered-By", "");
 
-  // CSP for security while allowing necessary resources
-  const csp = [
-    "default-src 'self'",
-    "script-src 'self' 'unsafe-inline'",
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data: https:",
-    "connect-src 'self' https://api.github.com https://github.com",
-    "frame-ancestors 'none'",
-    "base-uri 'self'",
-    "form-action 'self' https://github.com",
-  ].join("; ");
-
-  response.headers.set("Content-Security-Policy", csp);
+  // CSP is configured in svelte.config.js using SvelteKit's built-in CSP
+  // with automatic nonce generation (no unsafe-inline for scripts).
 
   return response;
 };
