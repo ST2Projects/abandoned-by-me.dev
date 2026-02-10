@@ -12,9 +12,11 @@ services:
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3456}
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+      LOG_DIR: /app/data/logs
       DEBUG: ${DEBUG:-false}
     volumes:
       - app_data:/app/data
+      - ./logs:/app/data/logs
     healthcheck:
       test:
         [

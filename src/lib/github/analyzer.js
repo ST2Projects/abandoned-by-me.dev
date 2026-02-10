@@ -1,7 +1,4 @@
-import {
-  getUserRepositories as getGitHubRepos,
-  createGitHubClient,
-} from "./client.js";
+import { createGitHubClient } from "./client.js";
 import { debugLog, errorLog } from "../utils/env.js";
 
 /**

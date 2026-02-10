@@ -294,3 +294,5 @@ package
 data/
 
 # End of https://www.toptal.com/developers/gitignore/api/intellij,go,svelte,node
+
+test-results
