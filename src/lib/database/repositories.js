@@ -42,9 +42,14 @@ import { debugLog, errorLog } from "../utils/env.js";
  * Upserts repositories for a user
  * @param {string} userId - User ID
  * @param {Repository[]} repositoryList - Array of repository data
+ * @param {string} [provider='github'] - Provider name ('github' or 'gitlab')
  * @returns {Promise<Repository[]>} Upserted repositories
  */
-export async function upsertRepositories(userId, repositoryList) {
+export async function upsertRepositories(
+  userId,
+  repositoryList,
+  provider = "github",
+) {
   try {
     if (repositoryList.length === 0) {
       return [];
@@ -52,6 +57,7 @@ export async function upsertRepositories(userId, repositoryList) {
 
     const values = repositoryList.map((repo) => ({
       userId,
+      provider,
       githubId: repo.github_id,
       name: repo.name,
       fullName: repo.full_name,
@@ -78,7 +84,11 @@ export async function upsertRepositories(userId, repositoryList) {
       .insert(repositories)
       .values(values)
       .onConflictDoUpdate({
-        target: [repositories.userId, repositories.githubId],
+        target: [
+          repositories.userId,
+          repositories.provider,
+          repositories.githubId,
+        ],
         set: {
           name: sql`excluded.name`,
           fullName: sql`excluded.full_name`,
@@ -209,23 +219,33 @@ export async function getPublicDashboardData(
 }
 
 /**
- * Deletes repositories that are no longer in the user's GitHub account
+ * Deletes repositories that are no longer in the user's account for a given provider
  * @param {string} userId - User ID
- * @param {number[]} currentGithubIds - Array of current GitHub repo IDs
+ * @param {number[]} currentExternalIds - Array of current external repo IDs
+ * @param {string} [provider='github'] - Provider name ('github' or 'gitlab')
  * @returns {Promise<number>} Number of repositories deleted
  */
-export async function cleanupRemovedRepositories(userId, currentGithubIds) {
+export async function cleanupRemovedRepositories(
+  userId,
+  currentExternalIds,
+  provider = "github",
+) {
   try {
-    if (currentGithubIds.length === 0) {
+    if (currentExternalIds.length === 0) {
       const result = await db
         .delete(repositories)
-        .where(eq(repositories.userId, userId))
+        .where(
+          and(
+            eq(repositories.userId, userId),
+            eq(repositories.provider, provider),
+          ),
+        )
         .returning({ id: repositories.id });
 
       const deletedCount = result.length;
       if (deletedCount > 0) {
         debugLog(
-          `Cleaned up ${deletedCount} removed repositories for user ${userId}`,
+          `Cleaned up ${deletedCount} removed ${provider} repositories for user ${userId}`,
         );
       }
 
@@ -237,7 +257,8 @@ export async function cleanupRemovedRepositories(userId, currentGithubIds) {
       .where(
         and(
           eq(repositories.userId, userId),
-          notInArray(repositories.githubId, currentGithubIds),
+          eq(repositories.provider, provider),
+          notInArray(repositories.githubId, currentExternalIds),
         ),
       )
       .returning({ id: repositories.id });
@@ -245,7 +266,7 @@ export async function cleanupRemovedRepositories(userId, currentGithubIds) {
     const deletedCount = result.length;
     if (deletedCount > 0) {
       debugLog(
-        `Cleaned up ${deletedCount} removed repositories for user ${userId}`,
+        `Cleaned up ${deletedCount} removed ${provider} repositories for user ${userId}`,
       );
     }
 

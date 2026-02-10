@@ -21,6 +21,15 @@ function getAuth() {
           clientSecret: process.env.GITHUB_CLIENT_SECRET,
           scope: ["read:user", "repo"],
         },
+        ...(process.env.GITLAB_CLIENT_ID && process.env.GITLAB_CLIENT_SECRET
+          ? {
+              gitlab: {
+                clientId: process.env.GITLAB_CLIENT_ID,
+                clientSecret: process.env.GITLAB_CLIENT_SECRET,
+                scope: ["read_user", "read_api"],
+              },
+            }
+          : {}),
       },
       session: {
         expiresIn: 60 * 60 * 24 * 7, // 7 days
