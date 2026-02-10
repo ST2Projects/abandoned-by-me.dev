@@ -40,7 +40,7 @@
     "globals": "^17.3.0",
     "lint-staged": "^16.2.7",
     "prettier": "^3.1.1",
-    "prettier-plugin-svelte": "^3.1.2",
+    "prettier-plugin-svelte": "^3.4.1",
     "simple-git-hooks": "^2.13.1",
     "svelte": "^4.2.7",
     "vite": "^5.4.21",
