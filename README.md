@@ -45,15 +45,15 @@ The SQLite database is created automatically on first run. No external services 
 
 ## Environment Variables
 
-| Variable               | Description                    | Default                 |
-| ---------------------- | ------------------------------ | ----------------------- |
-| `DATABASE_URL`         | SQLite file path               | `./data/app.db`         |
-| `GITHUB_CLIENT_ID`     | GitHub OAuth App client ID     | —                       |
-| `GITHUB_CLIENT_SECRET` | GitHub OAuth App client secret | —                       |
-| `BETTER_AUTH_SECRET`   | Secret for auth encryption     | —                       |
-| `BETTER_AUTH_URL`      | App URL for auth callbacks     | `http://localhost:5173` |
-| `REFRESH_INTERVAL_HOURS` | Auto-refresh interval        | `24`                    |
-| `DEBUG`                | Enable debug logging           | `false`                 |
+| Variable                 | Description                    | Default                 |
+| ------------------------ | ------------------------------ | ----------------------- |
+| `DATABASE_URL`           | SQLite file path               | `./data/app.db`         |
+| `GITHUB_CLIENT_ID`       | GitHub OAuth App client ID     | —                       |
+| `GITHUB_CLIENT_SECRET`   | GitHub OAuth App client secret | —                       |
+| `BETTER_AUTH_SECRET`     | Secret for auth encryption     | —                       |
+| `BETTER_AUTH_URL`        | App URL for auth callbacks     | `http://localhost:5173` |
+| `REFRESH_INTERVAL_HOURS` | Auto-refresh interval          | `24`                    |
+| `DEBUG`                  | Enable debug logging           | `false`                 |
 
 ## Commands
 
