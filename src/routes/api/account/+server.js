@@ -1,5 +1,5 @@
 import { error, json } from "@sveltejs/kit";
-import { auth } from "$lib/auth/auth.js";
+import { requireSession } from "$lib/utils/session.js";
 import { db, sqlite } from "$lib/database/drizzle.js";
 import {
   scanHistory,
@@ -17,18 +17,7 @@ import { accountDeleteLimiter, getClientKey } from "$lib/utils/rateLimit.js";
 export async function DELETE(event) {
   try {
     const { request } = event;
-    const session = await auth.api.getSession({ headers: request.headers });
-    if (!session?.user) {
-      throw error(401, "Authentication required");
-    }
-
-    // Validate session has not expired before irreversible action
-    if (
-      session.session?.expiresAt &&
-      new Date(session.session.expiresAt) < new Date()
-    ) {
-      throw error(401, "Session expired. Please sign in again.");
-    }
+    const session = await requireSession(request.headers);
 
     // Rate limit account deletion attempts per IP
     const rateCheck = accountDeleteLimiter.check(getClientKey(event));

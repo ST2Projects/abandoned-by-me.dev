@@ -32,7 +32,7 @@ export async function GET({ params }) {
         dashboardSlug: dashboardData.config.dashboardSlug,
       },
       user: {
-        id: dashboardData.user.id,
+        name: dashboardData.user.name,
       },
       stats: {
         total: publicRepositories.length,

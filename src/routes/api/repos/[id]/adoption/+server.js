@@ -1,5 +1,5 @@
 import { error, json } from "@sveltejs/kit";
-import { auth } from "$lib/auth/auth.js";
+import { requireSession } from "$lib/utils/session.js";
 import { db, repositories } from "$lib/database/drizzle.js";
 import { eq, and } from "drizzle-orm";
 import { adoptionLimiter } from "$lib/utils/rateLimit.js";
@@ -8,10 +8,7 @@ import { adoptionLimiter } from "$lib/utils/rateLimit.js";
  * Toggle up_for_adoption status on a repository (auth required, must own repo)
  */
 export async function POST({ params, request }) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session?.user) {
-    throw error(401, "Authentication required");
-  }
+  const session = await requireSession(request.headers);
 
   // Rate limit adoption toggles per user
   const rateCheck = adoptionLimiter.check(session.user.id);
