@@ -79,7 +79,3 @@ docker-compose -f docker-compose.dev.yml up
 ```
 
 SQLite data is persisted via a Docker volume. Set environment variables in your `.env` file or deployment platform (e.g., Dokploy).
-
-## License
-
-MIT
