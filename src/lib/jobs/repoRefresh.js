@@ -1,5 +1,8 @@
 import { sqlite } from "../database/drizzle.js";
-import { getGitHubToken } from "../database/accounts.js";
+import {
+  getGitHubToken,
+  getGitLabToken,
+} from "../database/accounts.js";
 import { getUserConfig } from "../database/userConfig.js";
 import {
   startScan,
@@ -12,6 +15,7 @@ import {
   cleanupRemovedRepositories,
 } from "../database/repositories.js";
 import { performRepositoryScan } from "../github/analyzer.js";
+import { performGitLabScan } from "../gitlab/analyzer.js";
 import { debugLog, errorLog, appLog } from "../utils/env.js";
 
 /** @type {number} Refresh interval in milliseconds (default 24 hours) */
@@ -40,7 +44,7 @@ let timeoutId = null;
  *
  * Instead of scanning every user at once, it spreads users across the entire
  * refresh interval. If the interval is 24 hours and there are 100 users, one
- * user is scanned roughly every 14 minutes. This prevents GitHub API bursts and
+ * user is scanned roughly every 14 minutes. This prevents API bursts and
  * distributes load evenly.
  *
  * Calling this multiple times is safe -- subsequent calls are no-ops.
@@ -72,7 +76,7 @@ export function stopRepoRefreshJob() {
 }
 
 /**
- * Runs one full refresh cycle: queries all users with linked GitHub accounts,
+ * Runs one full refresh cycle: queries all users with linked accounts,
  * then processes them one at a time with a calculated delay between each user.
  *
  * After the cycle finishes (or if there are no users), it schedules the next
@@ -84,15 +88,13 @@ async function runRefreshCycle() {
   const cycleStart = Date.now();
 
   try {
-    // Query all users with a linked GitHub account from better-auth tables.
-    // Uses the raw sqlite instance because these tables are managed by
-    // better-auth, not by the Drizzle schema (same pattern as accounts.js).
+    // Query all users with a linked account (GitHub or GitLab) from better-auth tables.
     const users = sqlite
       .prepare(
         `SELECT DISTINCT u.id, u.name
 				 FROM "user" u
 				 INNER JOIN "account" a ON u.id = a."userId"
-				 WHERE a."providerId" = 'github'`,
+				 WHERE a."providerId" IN ('github', 'gitlab')`,
       )
       .all();
 
@@ -105,8 +107,6 @@ async function runRefreshCycle() {
     }
 
     // Calculate delay between users to spread them across the full interval.
-    // e.g., 24 hours / 100 users = ~14.4 minutes per user.
-    // Never go below MIN_DELAY_BETWEEN_USERS_MS to avoid hammering the API.
     const delayBetweenUsers = Math.max(
       MIN_DELAY_BETWEEN_USERS_MS,
       Math.floor(REFRESH_INTERVAL_MS / users.length),
@@ -165,7 +165,41 @@ function scheduleNextCycle() {
 }
 
 /**
- * Refreshes repository data for a single user.
+ * Scans a single provider for a user and upserts results.
+ * @param {'github'|'gitlab'} provider
+ * @param {string} userId
+ * @param {string} username
+ * @param {boolean} includePrivate
+ * @param {string} accessToken
+ * @returns {Promise<{scanned: number, upserted: number, deleted: number}>}
+ */
+async function refreshProvider(
+  provider,
+  userId,
+  username,
+  includePrivate,
+  accessToken,
+) {
+  let repos;
+  if (provider === "github") {
+    repos = await performRepositoryScan(accessToken, username, includePrivate);
+  } else {
+    repos = await performGitLabScan(accessToken, includePrivate);
+  }
+
+  if (repos.length === 0) {
+    return { scanned: 0, upserted: 0, deleted: 0 };
+  }
+
+  const currentIds = repos.map((r) => r.github_id);
+  const upserted = await upsertRepositories(userId, repos, provider);
+  const deleted = await cleanupRemovedRepositories(userId, currentIds, provider);
+
+  return { scanned: repos.length, upserted: upserted.length, deleted };
+}
+
+/**
+ * Refreshes repository data for a single user across all linked providers.
  * Skips the user if they were scanned recently (within STALE_THRESHOLD_MS).
  *
  * @param {{ id: string, name: string }} user - User record
@@ -195,14 +229,15 @@ async function refreshUserRepos(user) {
     }
   }
 
-  // Get the GitHub access token (synchronous — uses raw sqlite)
-  const accessToken = getGitHubToken(user.id);
-  if (!accessToken) {
+  // Get tokens for all linked providers
+  const githubToken = getGitHubToken(user.id);
+  const gitlabToken = getGitLabToken(user.id);
+
+  if (!githubToken && !gitlabToken) {
     debugLog(`Repository refresh job: skipping ${user.name} (no token)`);
     return;
   }
 
-  // Reuse config from the auto-refresh check above for scanPrivateRepos preference
   const includePrivate = config?.scanPrivateRepos || false;
 
   appLog("JOB", "Refreshing repos for user " + user.id);
@@ -212,47 +247,47 @@ async function refreshUserRepos(user) {
   const scan = await startScan(user.id);
 
   try {
-    // Perform the same scan as the manual /scan endpoint:
-    // performRepositoryScan(accessToken, username, includePrivate)
-    const repositories = await performRepositoryScan(
-      accessToken,
-      user.name,
-      includePrivate,
-    );
+    let totalScanned = 0;
+    let totalUpserted = 0;
+    let totalDeleted = 0;
 
-    if (repositories.length === 0) {
-      await completeScan(scan.id, {
-        reposScanned: 0,
-        reposAdded: 0,
-        reposUpdated: 0,
-      });
-      debugLog(`Repository refresh job: ${user.name} done — 0 repos found`);
-      return;
+    if (githubToken) {
+      const gh = await refreshProvider(
+        "github",
+        user.id,
+        user.name,
+        includePrivate,
+        githubToken,
+      );
+      totalScanned += gh.scanned;
+      totalUpserted += gh.upserted;
+      totalDeleted += gh.deleted;
     }
 
-    // Get current GitHub IDs for cleanup
-    const currentGithubIds = repositories.map((repo) => repo.github_id);
-
-    // Upsert repositories to database
-    const upsertedRepos = await upsertRepositories(user.id, repositories);
-
-    // Clean up repositories that no longer exist on GitHub
-    const deletedCount = await cleanupRemovedRepositories(
-      user.id,
-      currentGithubIds,
-    );
+    if (gitlabToken) {
+      const gl = await refreshProvider(
+        "gitlab",
+        user.id,
+        user.name,
+        includePrivate,
+        gitlabToken,
+      );
+      totalScanned += gl.scanned;
+      totalUpserted += gl.upserted;
+      totalDeleted += gl.deleted;
+    }
 
     // Complete the scan
     await completeScan(scan.id, {
-      reposScanned: repositories.length,
-      reposAdded: upsertedRepos.length,
-      reposUpdated: upsertedRepos.length,
+      reposScanned: totalScanned,
+      reposAdded: totalUpserted,
+      reposUpdated: totalUpserted,
     });
 
     debugLog(`Repository refresh job: ${user.name} done`, {
-      scanned: repositories.length,
-      upserted: upsertedRepos.length,
-      deleted: deletedCount,
+      scanned: totalScanned,
+      upserted: totalUpserted,
+      deleted: totalDeleted,
     });
   } catch (err) {
     await failScan(scan.id, err);

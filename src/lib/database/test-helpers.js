@@ -79,6 +79,7 @@ export function createTestDb() {
 		CREATE TABLE IF NOT EXISTS "repositories" (
 			"id" TEXT PRIMARY KEY,
 			"user_id" TEXT NOT NULL,
+			"provider" TEXT NOT NULL DEFAULT 'github',
 			"github_id" INTEGER NOT NULL,
 			"name" TEXT NOT NULL,
 			"full_name" TEXT NOT NULL,
@@ -102,10 +103,11 @@ export function createTestDb() {
 			"updated_at" INTEGER NOT NULL,
 			"last_scanned_at" INTEGER NOT NULL
 		);
-		CREATE UNIQUE INDEX IF NOT EXISTS "repositories_user_id_github_id_unique" ON "repositories" ("user_id", "github_id");
+		CREATE UNIQUE INDEX IF NOT EXISTS "repositories_user_provider_external_id_unique" ON "repositories" ("user_id", "provider", "github_id");
 		CREATE INDEX IF NOT EXISTS "idx_repositories_user_id" ON "repositories" ("user_id");
 		CREATE INDEX IF NOT EXISTS "idx_repositories_last_commit_date" ON "repositories" ("last_commit_date");
 		CREATE INDEX IF NOT EXISTS "idx_repositories_github_id" ON "repositories" ("github_id");
+		CREATE INDEX IF NOT EXISTS "idx_repositories_provider" ON "repositories" ("provider");
 
 		CREATE TABLE IF NOT EXISTS "scan_history" (
 			"id" TEXT PRIMARY KEY,

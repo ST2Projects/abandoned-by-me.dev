@@ -120,6 +120,7 @@ export const repositories = sqliteTable(
       .primaryKey()
       .$defaultFn(() => crypto.randomUUID()),
     userId: text("user_id").notNull(),
+    provider: text("provider").default("github").notNull(),
     githubId: integer("github_id").notNull(),
     name: text("name").notNull(),
     fullName: text("full_name").notNull(),
@@ -155,15 +156,15 @@ export const repositories = sqliteTable(
   },
   (table) => {
     return {
-      userGithubUnique: uniqueIndex("repositories_user_id_github_id_unique").on(
-        table.userId,
-        table.githubId,
-      ),
+      userProviderExternalUnique: uniqueIndex(
+        "repositories_user_provider_external_id_unique",
+      ).on(table.userId, table.provider, table.githubId),
       userIdIdx: index("idx_repositories_user_id").on(table.userId),
       lastCommitDateIdx: index("idx_repositories_last_commit_date").on(
         table.lastCommitDate,
       ),
       githubIdIdx: index("idx_repositories_github_id").on(table.githubId),
+      providerIdx: index("idx_repositories_provider").on(table.provider),
     };
   },
 );

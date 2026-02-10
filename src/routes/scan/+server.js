@@ -14,7 +14,11 @@ import {
   getRunningScan,
 } from "$lib/database/scanHistory.js";
 import { performRepositoryScan } from "$lib/github/analyzer.js";
-import { getGitHubToken } from "$lib/database/accounts.js";
+import { performGitLabScan } from "$lib/gitlab/analyzer.js";
+import {
+  getGitHubToken,
+  getGitLabToken,
+} from "$lib/database/accounts.js";
 import { errorLog, debugLog, appLog } from "$lib/utils/env.js";
 import { scanLimiter, getClientKey } from "$lib/utils/rateLimit.js";
 
@@ -60,24 +64,31 @@ export async function POST(event) {
     // Get user configuration
     const config = await getUserConfig(userId);
 
-    // Get the GitHub access token from the account linked via better-auth
-    // Validate token BEFORE creating a scan record to avoid orphaned "running" records
-    const accessToken = getGitHubToken(userId);
+    // Check which providers are linked
+    const githubToken = getGitHubToken(userId);
+    const gitlabToken = getGitLabToken(userId);
 
-    if (!accessToken) {
+    if (!githubToken && !gitlabToken) {
       throw error(
         400,
-        "GitHub account not linked. Please sign in with GitHub again.",
+        "No accounts linked. Please sign in with GitHub or GitLab.",
       );
     }
 
-    // Start scan record (only after token is confirmed valid)
+    // Start scan record (only after at least one token is confirmed valid)
     const scan = await startScan(userId);
     appLog("SCAN", "Scan started for user " + userId);
     debugLog(`Started repository scan for user ${username}`);
 
     // Perform the scan asynchronously (don't await)
-    performScanAsync(scan.id, userId, username, config, accessToken);
+    performScanAsync(
+      scan.id,
+      userId,
+      username,
+      config,
+      githubToken,
+      gitlabToken,
+    );
 
     return json({
       success: true,
@@ -128,55 +139,121 @@ export async function GET({ url, request }) {
 }
 
 /**
- * Performs the repository scan asynchronously
+ * Performs the repository scan asynchronously across all linked providers
  */
-async function performScanAsync(scanId, userId, username, config, accessToken) {
+async function performScanAsync(
+  scanId,
+  userId,
+  username,
+  config,
+  githubToken,
+  gitlabToken,
+) {
   try {
     debugLog(`Performing async scan ${scanId} for user ${username}`);
 
-    // Perform the GitHub repository scan
-    const repositories = await performRepositoryScan(
-      accessToken,
-      username,
-      config.scanPrivateRepos,
-    );
+    let totalScanned = 0;
+    let totalUpserted = 0;
+    let totalDeleted = 0;
 
-    if (repositories.length === 0) {
-      await completeScan(scanId, {
-        reposScanned: 0,
-        reposAdded: 0,
-        reposUpdated: 0,
-      });
-      return;
+    // Scan GitHub repos if linked
+    if (githubToken) {
+      const ghResult = await scanProvider(
+        "github",
+        userId,
+        username,
+        config,
+        githubToken,
+      );
+      totalScanned += ghResult.scanned;
+      totalUpserted += ghResult.upserted;
+      totalDeleted += ghResult.deleted;
     }
 
-    // Get current GitHub IDs for cleanup
-    const currentGithubIds = repositories.map((repo) => repo.github_id);
-
-    // Upsert repositories to database
-    const upsertedRepos = await upsertRepositories(userId, repositories);
-
-    // Clean up repositories that no longer exist on GitHub
-    const deletedCount = await cleanupRemovedRepositories(
-      userId,
-      currentGithubIds,
-    );
+    // Scan GitLab repos if linked
+    if (gitlabToken) {
+      const glResult = await scanProvider(
+        "gitlab",
+        userId,
+        username,
+        config,
+        gitlabToken,
+      );
+      totalScanned += glResult.scanned;
+      totalUpserted += glResult.upserted;
+      totalDeleted += glResult.deleted;
+    }
 
     // Complete the scan
     await completeScan(scanId, {
-      reposScanned: repositories.length,
-      reposAdded: upsertedRepos.length,
-      reposUpdated: upsertedRepos.length,
+      reposScanned: totalScanned,
+      reposAdded: totalUpserted,
+      reposUpdated: totalUpserted,
     });
 
     appLog("SCAN", "Scan completed for user " + userId);
     debugLog(`Completed scan ${scanId}`, {
-      scanned: repositories.length,
-      upserted: upsertedRepos.length,
-      deleted: deletedCount,
+      scanned: totalScanned,
+      upserted: totalUpserted,
+      deleted: totalDeleted,
     });
   } catch (scanError) {
     errorLog(`Scan ${scanId} failed`, scanError);
     await failScan(scanId, scanError);
   }
+}
+
+/**
+ * Scans a single provider's repositories
+ * @param {'github'|'gitlab'} provider
+ * @param {string} userId
+ * @param {string} username
+ * @param {any} config
+ * @param {string} accessToken
+ * @returns {Promise<{scanned: number, upserted: number, deleted: number}>}
+ */
+async function scanProvider(provider, userId, username, config, accessToken) {
+  debugLog(`Scanning ${provider} repositories for ${username}`);
+
+  let repositories;
+
+  if (provider === "github") {
+    repositories = await performRepositoryScan(
+      accessToken,
+      username,
+      config.scanPrivateRepos,
+    );
+  } else {
+    repositories = await performGitLabScan(
+      accessToken,
+      config.scanPrivateRepos,
+    );
+  }
+
+  if (repositories.length === 0) {
+    return { scanned: 0, upserted: 0, deleted: 0 };
+  }
+
+  // Get current external IDs for cleanup
+  const currentExternalIds = repositories.map((repo) => repo.github_id);
+
+  // Upsert repositories to database
+  const upsertedRepos = await upsertRepositories(
+    userId,
+    repositories,
+    provider,
+  );
+
+  // Clean up repositories that no longer exist on the provider
+  const deletedCount = await cleanupRemovedRepositories(
+    userId,
+    currentExternalIds,
+    provider,
+  );
+
+  return {
+    scanned: repositories.length,
+    upserted: upsertedRepos.length,
+    deleted: deletedCount,
+  };
 }
