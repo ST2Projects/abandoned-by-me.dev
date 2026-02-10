@@ -191,6 +191,7 @@ The hooks file also starts the background repo refresh job on server startup.
 #### Rate Limiting
 
 In-memory sliding window rate limiter (`rateLimit.js`) with pre-configured limiters:
+
 - Scan: 5 per 10 minutes
 - Config updates: 20 per minute
 - Respects: 30 per minute per IP

@@ -58,7 +58,10 @@ const logger = pino(
  */
 export function debugLog(message, data) {
   if (dev) {
-    logger.debug({ tag: "APP", ...(data !== undefined ? { data } : {}) }, message);
+    logger.debug(
+      { tag: "APP", ...(data !== undefined ? { data } : {}) },
+      message,
+    );
   }
 }
 
@@ -87,7 +90,14 @@ export function errorLog(message, error) {
  */
 export function accessLog(method, pathname, status, durationMs, clientIp) {
   logger.info(
-    { tag: "ACCESS", method, pathname, status, durationMs, ...(clientIp ? { clientIp } : {}) },
+    {
+      tag: "ACCESS",
+      method,
+      pathname,
+      status,
+      durationMs,
+      ...(clientIp ? { clientIp } : {}),
+    },
     `${method} ${pathname} ${status} ${durationMs}ms${clientIp ? " " + clientIp : ""}`,
   );
 }

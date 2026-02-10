@@ -2,7 +2,6 @@ import { db, scanHistory } from "./drizzle.js";
 import { eq, desc, and } from "drizzle-orm";
 import { debugLog, errorLog } from "../utils/env.js";
 
-
 /**
  * @typedef {Object} ScanHistory
  * @property {string} id

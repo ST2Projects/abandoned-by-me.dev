@@ -253,9 +253,9 @@ test.describe("Dashboard - Authenticated", () => {
 
     // Click "Abandoned" tab
     await filterTabs.filter({ hasText: "Abandoned" }).click();
-    await expect(
-      filterTabs.filter({ hasText: "Abandoned" }),
-    ).toHaveClass(/active/);
+    await expect(filterTabs.filter({ hasText: "Abandoned" })).toHaveClass(
+      /active/,
+    );
 
     // Click "Active" tab
     await filterTabs.filter({ hasText: "Active" }).click();
@@ -501,10 +501,9 @@ test.describe("Adoption API", () => {
 
 test.describe("Pay Respects API", () => {
   test("increments respects count for a valid repo", async ({ request }) => {
-    const res = await request.post(
-      `/api/repos/${repoIds.abandoned2}/respect`,
-      { headers: originHeader() },
-    );
+    const res = await request.post(`/api/repos/${repoIds.abandoned2}/respect`, {
+      headers: originHeader(),
+    });
     expect(res.status()).toBe(200);
     const body = await res.json();
     expect(body.respectsCount).toBeGreaterThanOrEqual(4); // was 3 initially
