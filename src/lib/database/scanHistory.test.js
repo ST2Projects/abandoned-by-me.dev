@@ -21,10 +21,8 @@ vi.mock("./drizzle.js", async () => {
 import * as drizzleMod from "./drizzle.js";
 import {
   startScan,
-  updateScan,
   completeScan,
   failScan,
-  getUserScanHistory,
   getLatestScan,
   getRunningScan,
 } from "./scanHistory.js";
@@ -57,20 +55,6 @@ describe("scanHistory", () => {
       expect(scan.scanStartedAt.getTime()).toBeGreaterThanOrEqual(
         before.getTime() - 1000,
       );
-    });
-  });
-
-  describe("updateScan", () => {
-    it("should update scan fields", async () => {
-      const scan = await startScan(TEST_USER_ID);
-
-      const updated = await updateScan(scan.id, {
-        reposScanned: 10,
-        reposAdded: 5,
-      });
-
-      expect(updated.reposScanned).toBe(10);
-      expect(updated.reposAdded).toBe(5);
     });
   });
 
@@ -116,51 +100,6 @@ describe("scanHistory", () => {
 
       expect(failed.reposScanned).toBe(10);
       expect(failed.reposAdded).toBe(5);
-    });
-  });
-
-  describe("getUserScanHistory", () => {
-    it("should return empty array when no scans exist", async () => {
-      const history = await getUserScanHistory(TEST_USER_ID);
-      expect(history).toEqual([]);
-    });
-
-    it("should return scans ordered by createdAt descending", async () => {
-      const scan1 = await startScan(TEST_USER_ID);
-      await completeScan(scan1.id, {
-        reposScanned: 5,
-        reposAdded: 5,
-        reposUpdated: 0,
-      });
-
-      // SQLite timestamp mode stores seconds, need >1s gap for ordering
-      await new Promise((r) => setTimeout(r, 1100));
-
-      const scan2 = await startScan(TEST_USER_ID);
-      await completeScan(scan2.id, {
-        reposScanned: 10,
-        reposAdded: 10,
-        reposUpdated: 0,
-      });
-
-      const history = await getUserScanHistory(TEST_USER_ID);
-      expect(history).toHaveLength(2);
-      // Most recent should be first
-      expect(history[0].reposScanned).toBe(10);
-    });
-
-    it("should respect the limit parameter", async () => {
-      for (let i = 0; i < 5; i++) {
-        const scan = await startScan(TEST_USER_ID);
-        await completeScan(scan.id, {
-          reposScanned: i,
-          reposAdded: 0,
-          reposUpdated: 0,
-        });
-      }
-
-      const history = await getUserScanHistory(TEST_USER_ID, 3);
-      expect(history).toHaveLength(3);
     });
   });
 

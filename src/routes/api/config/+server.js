@@ -81,9 +81,22 @@ export async function POST({ request }) {
       delete updates.dashboardPublic;
     }
 
+    // Allowlist fields that users are permitted to update
+    const allowedFields = [
+      "abandonmentThresholdMonths",
+      "scanPrivateRepos",
+      "autoRefresh",
+    ];
+    const safeUpdates = {};
+    for (const key of allowedFields) {
+      if (key in updates) {
+        safeUpdates[key] = updates[key];
+      }
+    }
+
     // Apply remaining configuration updates (e.g., abandonmentThresholdMonths, scanPrivateRepos)
-    if (Object.keys(updates).length > 0) {
-      await updateUserConfig(userId, updates);
+    if (Object.keys(safeUpdates).length > 0) {
+      await updateUserConfig(userId, safeUpdates);
     }
 
     // Return the latest config state

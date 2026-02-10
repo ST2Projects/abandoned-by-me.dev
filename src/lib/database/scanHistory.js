@@ -2,6 +2,7 @@ import { db, scanHistory } from "./drizzle.js";
 import { eq, desc, and } from "drizzle-orm";
 import { debugLog, errorLog } from "../utils/env.js";
 
+
 /**
  * @typedef {Object} ScanHistory
  * @property {string} id
@@ -37,27 +38,6 @@ export async function startScan(userId) {
     return scan;
   } catch (error) {
     errorLog("Error starting scan", error);
-    throw error;
-  }
-}
-
-/**
- * Updates scan progress
- * @param {string} scanId - Scan ID
- * @param {Partial<ScanHistory>} updates - Updates to apply
- * @returns {Promise<ScanHistory>} Updated scan record
- */
-export async function updateScan(scanId, updates) {
-  try {
-    const [result] = await db
-      .update(scanHistory)
-      .set(updates)
-      .where(eq(scanHistory.id, scanId))
-      .returning();
-
-    return result;
-  } catch (error) {
-    errorLog("Error updating scan", error);
     throw error;
   }
 }
@@ -132,28 +112,6 @@ export async function failScan(scanId, error, partialResults = {}) {
   } catch (updateError) {
     errorLog("Error updating failed scan", updateError);
     throw updateError;
-  }
-}
-
-/**
- * Gets scan history for a user
- * @param {string} userId - User ID
- * @param {number} [limit=10] - Number of records to return
- * @returns {Promise<ScanHistory[]>} Scan history
- */
-export async function getUserScanHistory(userId, limit = 10) {
-  try {
-    const result = await db
-      .select()
-      .from(scanHistory)
-      .where(eq(scanHistory.userId, userId))
-      .orderBy(desc(scanHistory.createdAt))
-      .limit(limit);
-
-    return result;
-  } catch (error) {
-    errorLog("Error fetching scan history", error);
-    throw error;
   }
 }
 

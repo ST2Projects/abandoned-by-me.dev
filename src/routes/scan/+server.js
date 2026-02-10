@@ -112,7 +112,9 @@ export async function GET({ url, request }) {
       throw error(404, "Scan not found");
     }
 
-    return json(result[0]);
+    // Strip internal error details (may contain stack traces) from the response
+    const { errorDetails, ...scanData } = result[0];
+    return json(scanData);
   } catch (err) {
     if (err.status) throw err;
     errorLog("Error getting scan status", err);
