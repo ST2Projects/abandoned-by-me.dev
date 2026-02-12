@@ -18,7 +18,7 @@
     "db:push": "drizzle-kit push:sqlite",
     "db:migrate": "node src/lib/database/migrate.js",
     "db:studio": "drizzle-kit studio",
-    "prepare": "simple-git-hooks"
+    "prepare": "simple-git-hooks || true"
   },
   "type": "module",
   "dependencies": {
