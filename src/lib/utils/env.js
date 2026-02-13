@@ -17,7 +17,7 @@ try {
  * Creates a pino logger with stdout + daily-rotated file transports.
  *
  * Uses pino-roll for daily file rotation with 5-day retention.
- * Logs are written as human-readable text (not JSON) to both stdout and file.
+ * Logs are written as structured JSON to both stdout and file.
  */
 const logger = pino(
   {
