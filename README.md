@@ -1,7 +1,7 @@
 # Abandoned by Me
 
 >[!IMPORTANT]
-> Due to recent github outages this repo has been mograted to https://gitlab.com/st2projects1/abandoned-by-me-dev
+> Due to recent github outages this repo has been migrated to https://gitlab.com/st2projects1/abandoned-by-me-dev
 
 A cemetery for code that never made it. Sign in with GitHub, scan your repos, and face the truth about your abandoned side projects. Share your graveyard with the world so others can pay their respects.
 
