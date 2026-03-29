@@ -16,7 +16,6 @@ services:
       DEBUG: ${DEBUG:-false}
     volumes:
       - app_data:/app/data
-      - ./logs:/app/data/logs
     healthcheck:
       test:
         [
