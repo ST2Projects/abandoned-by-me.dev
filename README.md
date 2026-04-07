@@ -1,3 +1,6 @@
+> [!IMPORTANT]
+> Due to recent github outages this repo has been migrated to [https://gitlab.com/st2projects1/abandoned-by-me-dev](https://gitlab.com/st2projects1/abandoned-by-me-dev)
+
 # Abandoned by Me
 
 >[!IMPORTANT]
