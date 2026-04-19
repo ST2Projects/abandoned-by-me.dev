@@ -28,19 +28,25 @@ FROM base AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
-# Don't run production as root
+
+# su-exec for dropping privileges in the entrypoint
+RUN apk add --no-cache su-exec
+
+# Create non-root user
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 sveltekit
 
-# Create data directory for SQLite database
-RUN mkdir -p /app/data && chown sveltekit:nodejs /app/data
+# Create data and logs directories for SQLite database and log files
+RUN mkdir -p /app/data/logs && chown -R sveltekit:nodejs /app/data
 
 # Copy built application
 COPY --from=builder --chown=sveltekit:nodejs /app/build ./build
 COPY --from=builder --chown=sveltekit:nodejs /app/package*.json ./
 COPY --from=deps --chown=sveltekit:nodejs /app/node_modules ./node_modules
 
-USER sveltekit
+# Copy entrypoint script (runs as root to fix permissions, then drops to sveltekit)
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
 
 EXPOSE 3456
 
@@ -48,4 +54,5 @@ ENV HOST=0.0.0.0
 ENV PORT=3456
 ENV DATABASE_URL=/app/data/app.db
 
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
 CMD ["node", "build"]
